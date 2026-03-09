@@ -1,0 +1,13 @@
+id: billing-service
+name: billing-service
+layers:
+  global:
+    - formatting
+    - engineering
+  language:
+    - typescript
+  framework:
+    - bun
+    - bun-elysia
+  project:
+    - payment-rules

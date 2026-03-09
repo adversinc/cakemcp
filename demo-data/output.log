@@ -1,0 +1,36 @@
+request_id=unknown
+time=2026-03-09T18:12:05.701Z
+tool=resolve_context
+project_id=billing-service
+manifest=projects/billing-service.yaml
+layers=[
+  global/formatting.md,
+  global/engineering.md,
+  language/typescript.md,
+  framework/bun.md,
+  framework/bun-elysia.md,
+  project/payment-rules.md,
+  project/billing-service.md,
+]
+warnings=[]
+merged_size=1017
+cache=miss
+duration_ms=21
+request_id=unknown
+time=2026-03-09T18:12:35.442Z
+tool=resolve_context
+project_id=billing-service
+manifest=projects/billing-service.yaml
+layers=[
+  global/formatting.md,
+  global/engineering.md,
+  language/typescript.md,
+  framework/bun.md,
+  framework/bun-elysia.md,
+  project/payment-rules.md,
+  project/billing-service.md,
+]
+warnings=[]
+merged_size=1027
+cache=miss
+duration_ms=5

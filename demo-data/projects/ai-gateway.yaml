@@ -1,0 +1,11 @@
+id: ai-gateway
+name: ai-gateway
+layers:
+  global:
+    - engineering
+  language:
+    - typescript
+  framework:
+    - bun
+  project:
+    - prompt-safety
