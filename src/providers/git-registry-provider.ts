@@ -6,30 +6,37 @@ import { mkdir, rm } from "node:fs/promises";
 
 import { GitRefreshFailedError, RegistryUnavailableError } from "../errors";
 import type { Logger } from "../logger";
+import { resolveRegistryRoot } from "../utils/registry";
 import type { RegistryProvider } from "./types";
 
 type GitRunOptions = {
   cwd?: string;
 };
 
+type GitAuth = {
+  header?: string;
+  mode: "none" | "basic" | "bearer" | "bitbucket-token";
+};
+
 export class GitRegistryProvider implements RegistryProvider {
   public readonly type = "git" as const;
 
   private readonly cacheDir: string;
-  private readonly authHeader?: string;
+  private readonly auth: GitAuth;
   private lastRefreshAt = 0;
   private currentRevision?: string;
 
   constructor(
     private readonly repoUrl: string,
+    private readonly registryDir: string,
     cacheExpirySeconds: number,
     registryKey: string | undefined,
     private readonly logger: Logger,
   ) {
     const repoHash = createHash("sha256").update(repoUrl).digest("hex").slice(0, 16);
-    this.cacheDir = path.join(os.tmpdir(), "advers-mcp-registry", repoHash);
+    this.cacheDir = path.join(os.tmpdir(), "cakemcp", repoHash);
     this.cacheExpiryMs = cacheExpirySeconds * 1000;
-    this.authHeader = buildAuthHeader(repoUrl, registryKey);
+    this.auth = buildGitAuth(repoUrl, registryKey);
   }
 
   private readonly cacheExpiryMs: number;
@@ -45,7 +52,7 @@ export class GitRegistryProvider implements RegistryProvider {
       await this.clone();
       this.lastRefreshAt = Date.now();
       this.currentRevision = await this.readHeadRevision();
-      return this.cacheDir;
+      return resolveRegistryRoot(this.cacheDir, this.registryDir);
     }
 
     if (cacheExpired) {
@@ -72,7 +79,7 @@ export class GitRegistryProvider implements RegistryProvider {
       this.currentRevision = await this.readHeadRevision();
     }
 
-    return this.cacheDir;
+    return resolveRegistryRoot(this.cacheDir, this.registryDir);
   }
 
   async getFileRevision(_filePath: string): Promise<string> {
@@ -89,7 +96,10 @@ export class GitRegistryProvider implements RegistryProvider {
       await rm(this.cacheDir, { recursive: true, force: true });
       await this.runGit(["clone", "--depth", "1", this.repoUrl, this.cacheDir]);
     } catch (error) {
-      throw new RegistryUnavailableError("Failed to clone registry repository", error);
+      throw new RegistryUnavailableError(
+        `Failed to clone registry repository from ${sanitizeRepoUrl(this.repoUrl)}`,
+        buildGitErrorDetails(error, this.auth.mode),
+      );
     }
   }
 
@@ -102,7 +112,10 @@ export class GitRegistryProvider implements RegistryProvider {
       const branch = branchRef || "main";
       await this.runGit(["reset", "--hard", `origin/${branch}`], { cwd: this.cacheDir });
     } catch (error) {
-      throw new GitRefreshFailedError("Failed to refresh git registry", error);
+      throw new GitRefreshFailedError(
+        `Failed to refresh git registry from ${sanitizeRepoUrl(this.repoUrl)}`,
+        buildGitErrorDetails(error, this.auth.mode),
+      );
     }
   }
 
@@ -115,10 +128,10 @@ export class GitRegistryProvider implements RegistryProvider {
     const env = {
       ...process.env,
       GIT_TERMINAL_PROMPT: "0",
-      ...(this.authHeader ? { GIT_HTTP_EXTRA_HEADER: this.authHeader } : {}),
     };
+    const command = buildGitCommand(args, this.auth.header);
 
-    const proc = Bun.spawn(["git", ...args], {
+    const proc = Bun.spawn(command, {
       cwd: options.cwd,
       env,
       stderr: "pipe",
@@ -135,24 +148,119 @@ export class GitRegistryProvider implements RegistryProvider {
     const stderr = new TextDecoder().decode(stderrBuf);
 
     if (code !== 0) {
-      throw new Error(`git ${args.join(" ")} failed: ${stderr || stdout}`);
+      throw new GitCommandError(args, code, stdout, stderr);
     }
 
     return stdout;
   }
 }
 
-function buildAuthHeader(repoUrl: string, registryKey: string | undefined): string | undefined {
+class GitCommandError extends Error {
+  constructor(
+    public readonly args: string[],
+    public readonly exitCode: number,
+    public readonly stdout: string,
+    public readonly stderr: string,
+  ) {
+    super(`git ${args.join(" ")} failed with exit code ${exitCode}: ${stderr || stdout}`);
+    this.name = "GitCommandError";
+  }
+}
+
+export function buildGitAuth(repoUrl: string, registryKey: string | undefined): GitAuth {
   if (!registryKey || !repoUrl.startsWith("https://")) {
-    return undefined;
+    return { mode: "none" };
   }
 
   if (registryKey.includes(":")) {
     const encoded = Buffer.from(registryKey).toString("base64");
-    return `Authorization: Basic ${encoded}`;
+    return {
+      header: `Authorization: Basic ${encoded}`,
+      mode: "basic",
+    };
   }
 
-  return `Authorization: Bearer ${registryKey}`;
+  if (isBitbucketUrl(repoUrl)) {
+    const encoded = Buffer.from(`x-token-auth:${registryKey}`).toString("base64");
+    return {
+      header: `Authorization: Basic ${encoded}`,
+      mode: "bitbucket-token",
+    };
+  }
+
+  return {
+    header: `Authorization: Bearer ${registryKey}`,
+    mode: "bearer",
+  };
+}
+
+export function buildGitCommand(args: string[], authHeader?: string): string[] {
+  return authHeader ? ["git", "-c", `http.extraHeader=${authHeader}`, ...args] : ["git", ...args];
+}
+
+function isBitbucketUrl(repoUrl: string): boolean {
+  try {
+    const host = new URL(repoUrl).hostname.toLowerCase();
+    return host === "bitbucket.org" || host.endsWith(".bitbucket.org");
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeRepoUrl(repoUrl: string): string {
+  try {
+    const url = new URL(repoUrl);
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return repoUrl.replace(/\/\/[^/@]+@/, "//");
+  }
+}
+
+function buildGitErrorDetails(error: unknown, authMode: GitAuth["mode"]): Record<string, unknown> {
+  if (error instanceof GitCommandError) {
+    return {
+      auth_mode: authMode,
+      git_command: `git ${error.args.join(" ")}`,
+      exit_code: error.exitCode,
+      stderr: sanitizeGitOutput(error.stderr),
+      stdout: sanitizeGitOutput(error.stdout),
+      hint: buildGitHint(authMode, error.stderr || error.stdout),
+    };
+  }
+
+  return {
+    auth_mode: authMode,
+    error: asErrorMessage(error),
+  };
+}
+
+function sanitizeGitOutput(output: string): string | undefined {
+  const trimmed = output.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.replace(/https:\/\/([^/\s:@]+):([^@\s]+)@/g, "https://$1:***@");
+}
+
+function buildGitHint(authMode: GitAuth["mode"], output: string): string | undefined {
+  const lower = output.toLowerCase();
+
+  if (authMode === "bitbucket-token" && (lower.includes("authentication failed") || lower.includes("access denied"))) {
+    return "Bitbucket token auth uses Basic auth with username 'x-token-auth'. Verify the token has repository read access.";
+  }
+
+  if (lower.includes("repository not found")) {
+    return "Verify the repository URL and confirm the token can access that repository.";
+  }
+
+  if (lower.includes("could not read username") || lower.includes("authentication failed")) {
+    return "Git rejected the HTTP credentials. Verify the token value and authentication mode.";
+  }
+
+  return undefined;
 }
 
 function asErrorMessage(error: unknown): string {

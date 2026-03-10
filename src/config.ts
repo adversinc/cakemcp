@@ -1,9 +1,13 @@
+import { readFileSync } from "node:fs";
+
 import { InvalidEnvConfigError } from "./errors";
 
 const DEFAULT_CACHE_EXPIRY_SECONDS = 300;
+const DEFAULT_REGISTRY_DIR = "contexts";
 
 export type AppConfig = {
   contextRegistry: string;
+  registryDir: string;
   registryKey?: string;
   cacheExpirySeconds: number;
   transportType: "stdio" | "httpStream";
@@ -32,7 +36,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   return {
     contextRegistry,
-    registryKey: env.REGISTRY_KEY,
+    registryDir: readRegistryDir(env),
+    registryKey: readRegistryKey(env),
     cacheExpirySeconds,
     transportType,
     httpPort,
@@ -40,6 +45,38 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     debugMcp: env.DEBUG_MCP === "1",
     debugMcpOutputPath: env.DEBUG_MCP_OUTPUT?.trim() || "./output.log",
   };
+}
+
+function readRegistryDir(env: NodeJS.ProcessEnv): string {
+  return env.REGISTRY_DIR?.trim() || DEFAULT_REGISTRY_DIR;
+}
+
+function readRegistryKey(env: NodeJS.ProcessEnv): string | undefined {
+  const inlineKey = env.REGISTRY_KEY?.trim();
+  if (inlineKey) {
+    return inlineKey;
+  }
+
+  const keyFile = env.REGISTRY_KEY_FILE?.trim();
+  if (!keyFile) {
+    return undefined;
+  }
+
+  try {
+    const fileValue = readFileSync(keyFile, "utf8").trim();
+    if (!fileValue) {
+      throw new InvalidEnvConfigError(`REGISTRY_KEY_FILE is empty: ${keyFile}`);
+    }
+
+    return fileValue;
+  } catch (error) {
+    if (error instanceof InvalidEnvConfigError) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new InvalidEnvConfigError(`Failed to read REGISTRY_KEY_FILE '${keyFile}': ${message}`);
+  }
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number, fieldName: string): number {

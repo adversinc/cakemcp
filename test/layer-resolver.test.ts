@@ -10,7 +10,7 @@ import { ManifestParseError, ProjectNotFoundError } from "../src/errors";
 
 function buildResolver(registryPath: string) {
   const logger = createLogger("test");
-  const provider = new LocalRegistryProvider(registryPath, logger);
+  const provider = new LocalRegistryProvider(registryPath, ".", logger);
   const repository = new RegistryRepository(provider, 300, logger);
   const manifestLoader = new ProjectManifestLoader(repository);
   const resolver = new LayerResolver(repository, manifestLoader, logger);

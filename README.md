@@ -1,6 +1,25 @@
-# advers-mcp
+# cakemcp
 
-Production-oriented MVP of a remote MCP server for centrally distributing project context to coding agents.
+Server for centrally distributing project context to coding agents.
+
+This project is intended to maintain a centralized knowledge base for multiple projects written in multiple languages. 
+It is designed to provide a single source of truth for all AI agents in a company without duplicating or scattering core 
+rules across many repositories.
+
+The knowledge base is split into layers:
+- global agreements
+- language-specific rules
+- framework-related instructions and agreements
+- project-level specifics
+
+Layers are stored together to make de-duplication and sharing easier across projects, including AI-assisted maintenance 
+workflows.
+
+The MCP server can be used locally over `stdio` as well as remotely over the network, including authenticated 
+deployments.
+
+The service is designed to run safely in Kubernetes environments and is also suitable for Docker-based deployments, 
+including setups exposed to the public internet.
 
 Stack:
 - TypeScript
@@ -28,10 +47,17 @@ MCP_TRANSPORT=httpStream PORT=8080 bun run start
 - `CONTEXT_REGISTRY` (required)
   - local path to the registry
   - or git URL (`https://...`, `ssh://...`, `git@...`, `*.git`)
+- `REGISTRY_DIR` (optional)
+  - directory inside `CONTEXT_REGISTRY` that contains `projects/` and `layers/`
+  - defaults to `contexts`
+  - use `.` when the registry lives at the repo root
 - `REGISTRY_KEY` (optional)
   - key/token for private HTTPS git registry access
   - if it contains `:`, it is treated as Basic auth (`username:password`)
-  - otherwise it is treated as a Bearer token
+  - otherwise it is treated as a token for HTTPS git authentication
+- `REGISTRY_KEY_FILE` (optional)
+  - path to a file containing the private registry token/key
+  - used only when `REGISTRY_KEY` is not set
 - `CACHE_EXPIRY` (optional)
   - cache TTL in seconds (default `300`)
 - `MCP_TRANSPORT` (optional)
@@ -141,6 +167,7 @@ Git provider behavior:
 - stores a local checkout in a temp cache directory
 - does not perform a full clone on every request
 - refreshes no more often than `CACHE_EXPIRY`
+- resolves the registry under `REGISTRY_DIR` inside the cloned repo
 - if refresh fails but local copy exists, stale cache is used and an error is logged
 
 ## Logging

@@ -1,3 +1,6 @@
+import path from "node:path";
+import { existsSync } from "node:fs";
+
 export function isGitUrl(input: string): boolean {
   return (
     input.startsWith("http://") ||
@@ -14,4 +17,21 @@ export function sanitizeName(input: string): string {
   }
 
   return input;
+}
+
+export function resolveRegistryRoot(rootPath: string, registryDir: string): string {
+  const normalizedRegistryDir = registryDir.trim();
+  const candidates = [path.join(rootPath, normalizedRegistryDir), rootPath];
+
+  for (const candidate of candidates) {
+    if (hasRegistryLayout(candidate)) {
+      return candidate;
+    }
+  }
+
+  return rootPath;
+}
+
+function hasRegistryLayout(rootPath: string): boolean {
+  return existsSync(path.join(rootPath, "projects")) && existsSync(path.join(rootPath, "layers"));
 }

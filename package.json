@@ -1,5 +1,5 @@
 {
-  "name": "advers-mcp",
+  "name": "cakemcp",
   "module": "src/index.ts",
   "type": "module",
   "private": true,

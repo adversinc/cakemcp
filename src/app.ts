@@ -17,11 +17,18 @@ export async function buildServer() {
   const logger = createLogger("cakemcp");
 
   const provider: RegistryProvider = isGitUrl(config.contextRegistry)
-    ? new GitRegistryProvider(config.contextRegistry, config.cacheExpirySeconds, config.registryKey, logger)
-    : new LocalRegistryProvider(config.contextRegistry, logger);
+    ? new GitRegistryProvider(
+        config.contextRegistry,
+        config.registryDir,
+        config.cacheExpirySeconds,
+        config.registryKey,
+        logger,
+      )
+    : new LocalRegistryProvider(config.contextRegistry, config.registryDir, logger);
 
   logger.info("Startup config", {
     provider: provider.type,
+    registry_dir: config.registryDir,
     cache_expiry_seconds: config.cacheExpirySeconds,
     transport: config.transportType,
     http_port: config.httpPort,
@@ -40,7 +47,7 @@ export async function buildServer() {
     version: "0.1.1",
   });
 
-  registerTools(server, { repository, manifestLoader, layerResolver, debugLogger });
+  registerTools(server, { repository, manifestLoader, layerResolver, logger, debugLogger });
 
   return {
     config,

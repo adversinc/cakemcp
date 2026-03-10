@@ -17,7 +17,7 @@ describe("RegistryRepository cache", () => {
     await writeFile(layerPath, "v1", "utf8");
 
     const logger = createLogger("test-cache");
-    const provider = new LocalRegistryProvider(root, logger);
+    const provider = new LocalRegistryProvider(root, ".", logger);
     const repository = new RegistryRepository(provider, 1, logger);
 
     const first = await repository.readLayer("global", "formatting");

@@ -2,6 +2,7 @@ import { UserError, type FastMCP } from "fastmcp";
 import { z } from "zod";
 
 import { AppError, LayerNotFoundError } from "../errors";
+import type { Logger } from "../logger";
 import type { RegistryRepository } from "../registry/repository";
 import type { LayerResolver } from "../services/layer-resolver";
 import type { ProjectManifestLoader } from "../services/manifest-loader";
@@ -13,10 +14,11 @@ export function registerTools(
     repository: RegistryRepository;
     manifestLoader: ProjectManifestLoader;
     layerResolver: LayerResolver;
+    logger: Logger;
     debugLogger?: McpDebugLogger;
   },
 ): void {
-  const { repository, manifestLoader, layerResolver, debugLogger } = deps;
+  const { repository, manifestLoader, layerResolver, logger, debugLogger } = deps;
 
   server.addTool({
     name: "resolve_context",
@@ -51,7 +53,7 @@ export function registerTools(
 
         return JSON.stringify(execution.result, null, 2);
       } catch (error) {
-        throw mapError(error);
+        throw mapError(error, logger);
       }
     },
   });
@@ -69,7 +71,7 @@ export function registerTools(
         const projectIds = await repository.listProjectIds();
         return JSON.stringify({ project_ids: projectIds }, null, 2);
       } catch (error) {
-        throw mapError(error);
+        throw mapError(error, logger);
       }
     },
   });
@@ -90,7 +92,7 @@ export function registerTools(
         const manifest = await manifestLoader.load(project_id);
         return JSON.stringify(manifest, null, 2);
       } catch (error) {
-        throw mapError(error);
+        throw mapError(error, logger);
       }
     },
   });
@@ -125,24 +127,37 @@ export function registerTools(
           2,
         );
       } catch (error) {
-        throw mapError(error);
+        throw mapError(error, logger);
       }
     },
   });
 }
 
-function mapError(error: unknown): Error {
+export function mapError(error: unknown, logger: Logger): Error {
   if (error instanceof UserError) {
     return error;
   }
 
   if (error instanceof AppError) {
+    logger.error("Tool execution failed", {
+      error_code: error.code,
+      error_name: error.name,
+      error_message: error.message,
+      error_details: error.details,
+    });
     return new UserError(`[${error.code}] ${error.message}`);
   }
 
   if (error instanceof Error) {
+    logger.error("Tool execution failed", {
+      error_name: error.name,
+      error_message: error.message,
+    });
     return new UserError(error.message);
   }
 
+  logger.error("Tool execution failed", {
+    error_message: String(error),
+  });
   return new UserError(String(error));
 }

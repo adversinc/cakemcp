@@ -4,6 +4,7 @@ import { stat } from "node:fs/promises";
 
 import { RegistryUnavailableError } from "../errors";
 import type { Logger } from "../logger";
+import { resolveRegistryRoot } from "../utils/registry";
 import type { RegistryProvider } from "./types";
 
 export class LocalRegistryProvider implements RegistryProvider {
@@ -11,7 +12,11 @@ export class LocalRegistryProvider implements RegistryProvider {
 
   private readonly rootPath: string;
 
-  constructor(registryPath: string, private readonly logger: Logger) {
+  constructor(
+    registryPath: string,
+    private readonly registryDir: string,
+    private readonly logger: Logger,
+  ) {
     this.rootPath = path.resolve(registryPath);
   }
 
@@ -20,8 +25,9 @@ export class LocalRegistryProvider implements RegistryProvider {
       throw new RegistryUnavailableError(`Registry path does not exist: ${this.rootPath}`);
     }
 
-    this.logger.debug("Using local registry path", { registry_path: this.rootPath });
-    return this.rootPath;
+    const resolvedRoot = resolveRegistryRoot(this.rootPath, this.registryDir);
+    this.logger.debug("Using local registry path", { registry_path: resolvedRoot });
+    return resolvedRoot;
   }
 
   async getFileRevision(filePath: string): Promise<string> {
