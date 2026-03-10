@@ -2,6 +2,10 @@
 
 Server for centrally distributing project context to coding agents.
 
+`cakemcp` stands for a multi-layered but simple architecture and approach, like a piece of cake.
+
+## Basics
+
 This project is intended to maintain a centralized knowledge base for multiple projects written in multiple languages. 
 It is designed to provide a single source of truth for all AI agents in a company without duplicating or scattering core 
 rules across many repositories.
@@ -25,6 +29,24 @@ Stack:
 - TypeScript
 - Bun runtime
 - [`punkpeye/fastmcp`](https://github.com/punkpeye/fastmcp)
+
+## Example usage
+
+The `demo-data` folders are intended to show example usage for three projects:
+- frontend, written in TypeScript + MeteorJS
+- backend, written in TypeScript + Bun + Elysia
+- billing service, written in C#
+
+Project manifests contain the list of knowledge layers used by each project. Some knowledge is shared across projects, 
+for example global agreements used everywhere or language-specific rules reused by both frontend and backend services.
+
+Adding a new project, such as an auth backend service, typically requires creating a project manifest file and, if 
+needed, adding project-specific knowledge layers.
+
+Projects do not need to share any knowledge at all. This also supports cases where multiple unrelated company products 
+are stored in the same centralized registry.
+
+The `demo-data` content is currently marked as TODO and will be synced soon.
 
 ## Run
 
