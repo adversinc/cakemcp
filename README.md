@@ -2,7 +2,7 @@
 
 Server for centrally distributing project context to coding agents.
 
-`cakemcp` stands for a multi-layered but simple architecture and approach, like a piece of cake.
+`cakemcp` stands for a multi-layered but simple architecture and approach. Like a piece of cake.
 
 ## Basics
 
@@ -19,7 +19,7 @@ The knowledge base is split into layers:
 Layers are stored together to make de-duplication and sharing easier across projects, including AI-assisted maintenance 
 workflows.
 
-The MCP server can be used locally over `stdio` as well as remotely over the network, including authenticated 
+`cakemcp` MCP server can be used locally over `stdio` as well as remotely over the network, including authenticated 
 deployments.
 
 The service is designed to run safely in Kubernetes environments and is also suitable for Docker-based deployments, 
@@ -46,7 +46,20 @@ needed, adding project-specific knowledge layers.
 Projects do not need to share any knowledge at all. This also supports cases where multiple unrelated company products 
 are stored in the same centralized registry.
 
-The `demo-data` content is currently marked as TODO and will be synced soon.
+TODO: The `demo-data` content is currently marked as TODO and will be synced soon.
+
+## Data access paradigm
+
+"All data available once authorized". There is no scope-based access control within the knowledge base itself. 
+Any developer or AI agent in the company may access any included project knowledge once they are authorized to use 
+`cakemcp`.
+
+This means you need to:
+- configure proper IAM access for entry into `cakemcp`
+- avoid storing keys, tokens, or secrets inside the knowledge repository (as usual)
+
+If it is truly necessary, sensitive data can be placed in `AGENTS.md` within the corresponding project code 
+repository instead.
 
 ## Run
 
@@ -81,28 +94,31 @@ MCP_TRANSPORT=httpStream PORT=8080 bun run start
   - path to a file containing the private registry token/key
   - used only when `REGISTRY_KEY` is not set
 - `CACHE_EXPIRY` (optional)
-  - cache TTL in seconds (default `300`)
+  - repository cache TTL in seconds (default `300`)
 - `MCP_TRANSPORT` (optional)
   - `stdio` (default) or `httpStream`
 - `PORT`, `HOST` (optional)
   - used for `httpStream`
 - `DEBUG_MCP` (optional)
-  - set to `1` to enable resolve_context debug traces
+  - set to `1` to enable `resolve_context` debug traces. Saves ouput summaries to `DEBUG_MCP_OUTPUT` file 
 - `DEBUG_MCP_OUTPUT` (optional)
-  - output file path for debug traces (default `./data/output.log`)
+  - output file path for debug traces (default `./output.log`)
 
 ## Registry Layout
 
 ```text
-projects/*.yaml
+projects/*.yaml - project manifests
+layers/ - layer markdown files
 layers/global/*.md
 layers/language/*.md
 layers/framework/*.md
 layers/project/*.md
 ```
 
-Layer authoring note:
-- Prefer level-2 headings (`##`) inside layer markdown files, because the merged output already uses a top-level layer header (`# Layer: ...`) per block.
+### Layer authoring note
+
+Prefer level-2 headings (`##`) inside layer markdown files, because the merged output already uses a top-level layer
+header (`# Layer: ...`) per block.
 
 ### Manifest Example
 
@@ -118,16 +134,17 @@ layers:
     - nextjs
     - bun
   project:
+    - billing-service # This is actually redundant, layers/project/billing-service.md is auto-added
     - payment-rules
 ```
 
 Rules:
 - `name` is optional (defaults to `project_id` if missing)
 - `layers.*` are optional
-- project manifest is resolved from `projects/${project_id}.yaml` (or `.yml`)
-- auto-layer is always attempted as `layers/project/${name}.md`
+- project manifest is resolved by project_id from `projects/${project_id}.yaml`
+- auto-layer is always attempted as `layers/project/${name}.md` (even if not specified in `manifest.project`)
 
-## MCP Tools
+## MCP Tools Reference
 
 ### `resolve_context`
 
@@ -217,7 +234,7 @@ Covered scenarios:
 - manifest parsing
 - basic cache behavior
 
-## Current MVP Limitations
+## Conceptual Limitations
 
 - no database, vector DB, or embeddings
 - no UI/admin/auth platform
@@ -247,4 +264,12 @@ warnings=[...]
 merged_size=18423
 cache=hit
 duration_ms=47
+```
+
+### Further debugging
+
+To debug the actual output of `resolve_context` and other tools, use official SDK inspector:
+
+```bash
+npx @modelcontextprotocol/inspector
 ```
