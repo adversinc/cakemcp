@@ -70,7 +70,7 @@ export class RegistryRepository {
     type: LayerType,
     name: string,
     cacheStats?: RequestCacheStats,
-  ): Promise<{ path: string; relativePath: string; content: string } | null> {
+  ): Promise<{ path: string; relativePath: string; content: string; revision: string } | null> {
     const cleanName = sanitizeName(name);
     const rootPath = await this.provider.getRootPath();
     const relativePath = path.join("layers", type, `${cleanName}.md`);
@@ -81,10 +81,21 @@ export class RegistryRepository {
       return null;
     }
 
+    let revision = "unknown";
+    try {
+      revision = await this.provider.getFileRevision(layerPath);
+    } catch (error) {
+      this.logger.warn("Failed to resolve file revision", {
+        file_path: layerPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     return {
       path: layerPath,
       relativePath,
       content,
+      revision,
     };
   }
 

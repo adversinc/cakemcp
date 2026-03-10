@@ -21,6 +21,11 @@ export function registerTools(
   server.addTool({
     name: "resolve_context",
     description: "Resolve merged context layers for a project",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
     parameters: z.object({
       project_id: z.string().min(1),
       task_type: z.string().optional(),
@@ -54,6 +59,11 @@ export function registerTools(
   server.addTool({
     name: "list_projects",
     description: "List available project IDs from the registry",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
     execute: async () => {
       try {
         const projectIds = await repository.listProjectIds();
@@ -67,6 +77,11 @@ export function registerTools(
   server.addTool({
     name: "get_project_manifest",
     description: "Get parsed project manifest by project_id",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
     parameters: z.object({
       project_id: z.string().min(1),
     }),
@@ -83,6 +98,11 @@ export function registerTools(
   server.addTool({
     name: "get_layer",
     description: "Get raw content of a specific layer",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
     parameters: z.object({
       type: z.enum(["global", "language", "framework", "project"]),
       name: z.string().min(1),

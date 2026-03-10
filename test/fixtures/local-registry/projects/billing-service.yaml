@@ -1,4 +1,3 @@
-id: billing-service
 name: billing-service
 layers:
   global:

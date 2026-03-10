@@ -10,6 +10,12 @@ import type {
 import type { ProjectManifestLoader } from "./manifest-loader";
 
 const RESOLUTION_ORDER: LayerType[] = ["global", "language", "framework", "project"];
+const BASE_PRIORITY: Record<LayerType, number> = {
+  global: 100,
+  language: 200,
+  framework: 300,
+  project: 400,
+};
 
 export class LayerResolver {
   constructor(
@@ -30,12 +36,20 @@ export class LayerResolver {
     };
 
     const loadedManifest = await this.manifestLoader.loadWithMeta(input.project_id, cacheStats);
+    const projectId = loadedManifest.projectId;
     const manifest = loadedManifest.manifest;
 
-    this.logger.info("Project lookup", { project_id: input.project_id, project_name: manifest.name });
+    this.logger.info("Project lookup", { project_id: projectId, project_name: manifest.name });
 
     const warnings: string[] = [];
     const resolvedLayers: LayerRecord[] = [];
+    const seenLayers = new Set<string>();
+    const layerTypeCounters: Record<LayerType, number> = {
+      global: 0,
+      language: 0,
+      framework: 0,
+      project: 0,
+    };
 
     for (const type of RESOLUTION_ORDER) {
       const names = manifest.layers[type] ?? [];
@@ -45,17 +59,24 @@ export class LayerResolver {
         if (!layer) {
           const warning = `Layer not found in manifest: ${type}/${name}`;
           warnings.push(warning);
-          this.logger.warn("Missing layer from manifest", { type, name, project_id: manifest.id });
+          this.logger.warn("Missing layer from manifest", { type, name, project_id: projectId });
           continue;
         }
 
-        resolvedLayers.push({
-          type,
-          name,
-          path: layer.path,
-          relativePath: layer.relativePath.replace(/\\/g, "/"),
-          content: layer.content,
-        });
+        const unique = markLayerSeen(type, name, seenLayers);
+
+        if (unique) {
+          resolvedLayers.push({
+            type,
+            name,
+            path: layer.path,
+            relativePath: layer.relativePath.replace(/\\/g, "/"),
+            priority: BASE_PRIORITY[type] + layerTypeCounters[type],
+            revision: layer.revision,
+            content: layer.content,
+          });
+          layerTypeCounters[type] += 1;
+        }
       }
     }
 
@@ -63,27 +84,35 @@ export class LayerResolver {
     const autoLayer = await this.repository.readLayer("project", autoLayerName, cacheStats);
 
     if (autoLayer) {
-      resolvedLayers.push({
-        type: "project",
-        name: autoLayerName,
-        path: autoLayer.path,
-        relativePath: autoLayer.relativePath.replace(/\\/g, "/"),
-        content: autoLayer.content,
-      });
+      const unique = markLayerSeen("project", autoLayerName, seenLayers);
+      if (unique) {
+        resolvedLayers.push({
+          type: "project",
+          name: autoLayerName,
+          path: autoLayer.path,
+          relativePath: autoLayer.relativePath.replace(/\\/g, "/"),
+          priority: BASE_PRIORITY.project + layerTypeCounters.project,
+          revision: autoLayer.revision,
+          content: autoLayer.content,
+        });
+        layerTypeCounters.project += 1;
+      }
     }
 
     const mergedContent = resolvedLayers
-      .map((layer) => `## Layer: ${layer.type}/${layer.name}\n${layer.content.trim()}\n`)
+      .map((layer) => `# Layer: ${layer.type}/${layer.name}\n\n${layer.content.trim()}\n`)
       .join("\n")
       .trim();
 
     const result: ResolveContextResult = {
-      project_id: manifest.id,
+      project_id: projectId,
       project_name: manifest.name,
       resolved_layers: resolvedLayers.map((layer) => ({
         type: layer.type,
         name: layer.name,
         path: layer.path,
+        priority: layer.priority,
+        revision: layer.revision,
       })),
       merged_content: mergedContent,
       ...(warnings.length > 0 ? { warnings } : {}),
@@ -92,7 +121,7 @@ export class LayerResolver {
     return {
       result,
       debug: {
-        projectId: manifest.id,
+        projectId,
         manifestPath: loadedManifest.manifestPath,
         layerPaths: resolvedLayers.map((layer) => `${layer.type}/${layer.name}.md`),
         warnings,
@@ -102,4 +131,14 @@ export class LayerResolver {
       },
     };
   }
+}
+
+function markLayerSeen(type: LayerType, name: string, seenLayers: Set<string>): boolean {
+  const key = `${type}/${name}`;
+  if (seenLayers.has(key)) {
+    return false;
+  }
+
+  seenLayers.add(key);
+  return true;
 }

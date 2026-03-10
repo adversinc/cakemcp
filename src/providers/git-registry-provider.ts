@@ -18,6 +18,7 @@ export class GitRegistryProvider implements RegistryProvider {
   private readonly cacheDir: string;
   private readonly authHeader?: string;
   private lastRefreshAt = 0;
+  private currentRevision?: string;
 
   constructor(
     private readonly repoUrl: string,
@@ -43,6 +44,7 @@ export class GitRegistryProvider implements RegistryProvider {
       this.logger.info("Cloning git registry", { provider: "git" });
       await this.clone();
       this.lastRefreshAt = Date.now();
+      this.currentRevision = await this.readHeadRevision();
       return this.cacheDir;
     }
 
@@ -51,6 +53,7 @@ export class GitRegistryProvider implements RegistryProvider {
       try {
         await this.refresh();
         this.lastRefreshAt = Date.now();
+        this.currentRevision = await this.readHeadRevision();
       } catch (error) {
         this.logger.error("Git refresh failed; using stale cache", {
           provider: "git",
@@ -65,7 +68,20 @@ export class GitRegistryProvider implements RegistryProvider {
       throw new RegistryUnavailableError("Git registry cache is unavailable");
     }
 
+    if (!this.currentRevision) {
+      this.currentRevision = await this.readHeadRevision();
+    }
+
     return this.cacheDir;
+  }
+
+  async getFileRevision(_filePath: string): Promise<string> {
+    await this.getRootPath();
+    if (!this.currentRevision) {
+      this.currentRevision = await this.readHeadRevision();
+    }
+
+    return this.currentRevision;
   }
 
   private async clone(): Promise<void> {
@@ -88,6 +104,11 @@ export class GitRegistryProvider implements RegistryProvider {
     } catch (error) {
       throw new GitRefreshFailedError("Failed to refresh git registry", error);
     }
+  }
+
+  private async readHeadRevision(): Promise<string> {
+    const revision = await this.runGit(["rev-parse", "HEAD"], { cwd: this.cacheDir });
+    return revision.trim();
   }
 
   private async runGit(args: string[], options: GitRunOptions = {}): Promise<string> {

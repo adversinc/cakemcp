@@ -14,7 +14,7 @@ import { isGitUrl } from "./utils/registry";
 
 export async function buildServer() {
   const config = loadConfig();
-  const logger = createLogger("advers-mcp");
+  const logger = createLogger("cakemcp");
 
   const provider: RegistryProvider = isGitUrl(config.contextRegistry)
     ? new GitRegistryProvider(config.contextRegistry, config.cacheExpirySeconds, config.registryKey, logger)
@@ -36,8 +36,8 @@ export async function buildServer() {
   const debugLogger = config.debugMcp ? new McpDebugLogger(config.debugMcpOutputPath) : undefined;
 
   const server = new FastMCP({
-    name: "central-context-registry",
-    version: "0.1.0",
+    name: "cakemcp",
+    version: "0.1.1",
   });
 
   registerTools(server, { repository, manifestLoader, layerResolver, debugLogger });

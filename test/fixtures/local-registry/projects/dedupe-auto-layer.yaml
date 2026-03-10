@@ -1,0 +1,6 @@
+name: billing-service
+layers:
+  global:
+    - formatting
+  project:
+    - billing-service

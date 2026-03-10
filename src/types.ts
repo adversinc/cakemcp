@@ -5,6 +5,8 @@ export type LayerRecord = {
   name: string;
   path: string;
   relativePath: string;
+  priority: number;
+  revision: string;
   content: string;
 };
 
@@ -12,10 +14,11 @@ export type ResolvedLayer = {
   type: LayerType;
   name: string;
   path: string;
+  priority: number;
+  revision: string;
 };
 
 export type ProjectManifest = {
-  id: string;
   name: string;
   layers: Partial<Record<LayerType, string[]>>;
 };

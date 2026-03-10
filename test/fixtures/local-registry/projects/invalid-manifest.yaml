@@ -1,4 +1,3 @@
-id: invalid-manifest
 name: invalid-manifest
 layers:
   global: should-be-array

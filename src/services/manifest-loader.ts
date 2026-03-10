@@ -7,6 +7,7 @@ import type { LayerType, ProjectManifest } from "../types";
 const LAYER_TYPES: LayerType[] = ["global", "language", "framework", "project"];
 
 export type LoadedManifest = {
+  projectId: string;
   manifest: ProjectManifest;
   manifestPath: string;
 };
@@ -38,13 +39,12 @@ export class ProjectManifestLoader {
     }
 
     const record = raw as Record<string, unknown>;
-    const id = asString(record.id, "id", projectId);
-    const name = asString(record.name, "name", projectId);
+    const name = asOptionalName(record.name, projectId);
     const layers = parseLayers(record.layers, projectId);
 
     return {
+      projectId,
       manifest: {
-        id,
         name,
         layers,
       },
@@ -53,9 +53,13 @@ export class ProjectManifestLoader {
   }
 }
 
-function asString(value: unknown, field: string, projectId: string): string {
+function asOptionalName(value: unknown, projectId: string): string {
+  if (value == null) {
+    return projectId;
+  }
+
   if (typeof value !== "string" || value.trim() === "") {
-    throw new ManifestParseError(projectId, `Field '${field}' is required and must be a non-empty string`);
+    throw new ManifestParseError(projectId, "Field 'name' must be a non-empty string when provided");
   }
 
   return value;

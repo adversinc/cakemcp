@@ -53,10 +53,12 @@ layers/framework/*.md
 layers/project/*.md
 ```
 
+Layer authoring note:
+- Prefer level-2 headings (`##`) inside layer markdown files, because the merged output already uses a top-level layer header (`# Layer: ...`) per block.
+
 ### Manifest Example
 
 ```yaml
-id: billing-service
 name: billing-service
 layers:
   global:
@@ -72,8 +74,7 @@ layers:
 ```
 
 Rules:
-- `id` is required
-- `name` is required
+- `name` is optional (defaults to `project_id` if missing)
 - `layers.*` are optional
 - project manifest is resolved from `projects/${project_id}.yaml` (or `.yml`)
 - auto-layer is always attempted as `layers/project/${name}.md`
@@ -101,17 +102,17 @@ Behavior:
 Output (JSON string):
 - `project_id`
 - `project_name`
-- `resolved_layers[]` (`type`, `name`, `path`)
+- `resolved_layers[]` (`type`, `name`, `path`, `priority`, `revision`)
 - `merged_content`
 - `warnings[]` (if any)
 
 `merged_content` example fragment:
 
 ```md
-## Layer: global/formatting
+# Layer: global/formatting
 ...content...
 
-## Layer: language/typescript
+# Layer: language/typescript
 ...content...
 ```
 

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
+import { stat } from "node:fs/promises";
 
 import { RegistryUnavailableError } from "../errors";
 import type { Logger } from "../logger";
@@ -21,5 +22,10 @@ export class LocalRegistryProvider implements RegistryProvider {
 
     this.logger.debug("Using local registry path", { registry_path: this.rootPath });
     return this.rootPath;
+  }
+
+  async getFileRevision(filePath: string): Promise<string> {
+    const fileStat = await stat(filePath);
+    return String(Math.floor(fileStat.mtimeMs / 1000));
   }
 }
