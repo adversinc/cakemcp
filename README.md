@@ -1,14 +1,16 @@
 # cakemcp
 
-Server for centrally distributing project context to coding agents.
+MCP server for centrally distributing multiple projects context to coding agents.
 
 `cakemcp` stands for a multi-layered but simple architecture and approach. Like a piece of cake.
 
 ## Basics
 
-This project is intended to maintain a centralized knowledge base for multiple projects written in multiple languages. 
+This project is intended to distribute a centralized knowledge base for multiple projects written in multiple languages. 
 It is designed to provide a single source of truth for all AI agents in a company without duplicating or scattering core 
 rules across many repositories.
+
+The knowledge base itself is collected from either a git repository (public or private), or a local directory.
 
 The knowledge base is split into layers:
 - global agreements
@@ -60,6 +62,13 @@ This means you need to:
 
 If it is truly necessary, sensitive data can be placed in `AGENTS.md` within the corresponding project code 
 repository instead.
+
+## Conceptual Limitations
+
+- no database required, vector DB, or embeddings
+- no UI/admin/auth platform
+- no heavy enterprise abstractions
+- tool output is returned as a JSON string (MCP-client friendly)
 
 ## Run
 
@@ -192,7 +201,9 @@ Returns parsed manifest.
 Input: `type`, `name`.
 Returns raw layer content.
 
-## Error Handling and Degradation
+## Implementation Notes
+
+### Error Handling and Degradation
 
 `resolve_context` does not fail because of a missing optional layer from the manifest:
 - missing layer is added to `warnings`
@@ -209,7 +220,7 @@ Git provider behavior:
 - resolves the registry under `REGISTRY_DIR` inside the cloned repo
 - if refresh fails but local copy exists, stale cache is used and an error is logged
 
-## Logging
+### Logging
 
 JSON structured logs include:
 - startup summary (without secrets)
@@ -219,7 +230,7 @@ JSON structured logs include:
 - warnings for missing layers
 - git refresh failures
 
-## Tests
+### Tests
 
 ```bash
 bun test
@@ -233,13 +244,6 @@ Covered scenarios:
 - project not found
 - manifest parsing
 - basic cache behavior
-
-## Conceptual Limitations
-
-- no database, vector DB, or embeddings
-- no UI/admin/auth platform
-- no heavy enterprise abstractions
-- tool output is returned as a JSON string (MCP-client friendly)
 
 ## Debug Mode
 
