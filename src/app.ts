@@ -1,5 +1,6 @@
 import { FastMCP } from "fastmcp";
 
+import { buildAuthOptions, type ServerSession } from "./auth";
 import { loadConfig } from "./config";
 import { McpDebugLogger } from "./debug/mcp-debug-logger";
 import { createLogger } from "./logger";
@@ -33,6 +34,7 @@ export async function buildServer() {
     transport: config.transportType,
     http_port: config.httpPort,
     has_registry_key: Boolean(config.registryKey),
+    auth_mode: config.auth.mode,
     debug_mcp: config.debugMcp,
     debug_output_path: config.debugMcpOutputPath,
   });
@@ -42,12 +44,20 @@ export async function buildServer() {
   const layerResolver = new LayerResolver(repository, manifestLoader, logger);
   const debugLogger = config.debugMcp ? new McpDebugLogger(config.debugMcpOutputPath) : undefined;
 
-  const server = new FastMCP({
+  const server = new FastMCP<ServerSession>({
     name: "cakemcp",
     version: "0.1.1",
+    ...buildAuthOptions(config),
   });
 
-  registerTools(server, { repository, manifestLoader, layerResolver, logger, debugLogger });
+  registerTools(server, {
+    repository,
+    manifestLoader,
+    layerResolver,
+    logger,
+    debugLogger,
+    authRequired: config.auth.mode !== "none",
+  });
 
   return {
     config,

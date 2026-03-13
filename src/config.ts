@@ -13,9 +13,28 @@ export type AppConfig = {
   transportType: "stdio" | "httpStream";
   httpPort: number;
   httpHost: string;
+  auth: AuthConfig;
   debugMcp: boolean;
   debugMcpOutputPath: string;
 };
+
+export type AuthConfig =
+  | {
+      mode: "none";
+    }
+  | {
+      mode: "apiKey";
+      accessApiKey: string;
+    }
+  | {
+      mode: "oauth";
+      authorizationEndpoint: string;
+      baseUrl: string;
+      clientId: string;
+      clientSecret: string;
+      scopes: string[];
+      tokenEndpoint: string;
+    };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const contextRegistry = env.CONTEXT_REGISTRY?.trim();
@@ -33,6 +52,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const transportType = env.MCP_TRANSPORT === "httpStream" ? "httpStream" : "stdio";
   const httpPort = parsePositiveInt(env.PORT, 8080, "PORT");
   const httpHost = env.HOST?.trim() || "0.0.0.0";
+  const auth = readAuthConfig(env, transportType);
 
   return {
     contextRegistry,
@@ -42,6 +62,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     transportType,
     httpPort,
     httpHost,
+    auth,
     debugMcp: env.DEBUG_MCP === "1",
     debugMcpOutputPath: env.DEBUG_MCP_OUTPUT?.trim() || "./output.log",
   };
@@ -91,4 +112,70 @@ function parsePositiveInt(value: string | undefined, fallback: number, fieldName
   }
 
   return parsed;
+}
+
+function readAuthConfig(
+  env: NodeJS.ProcessEnv,
+  transportType: AppConfig["transportType"],
+): AuthConfig {
+  const oauthAuthorizationEndpoint = env.OAUTH_AUTH_ENDPOINT?.trim();
+  const accessApiKey = env.ACCESS_API_KEY?.trim();
+
+  if (transportType === "httpStream" && !oauthAuthorizationEndpoint && !accessApiKey) {
+    throw new InvalidEnvConfigError(
+      'OAUTH_AUTH_ENDPOINT or ACCESS_API_KEY is required when MCP_TRANSPORT=httpStream. Set to "OAUTH_AUTH_ENDPOINT=NONE" if you want leave your MCP server open.',
+    );
+  }
+
+  if (oauthAuthorizationEndpoint && oauthAuthorizationEndpoint !== "NONE" && accessApiKey) {
+    throw new InvalidEnvConfigError(
+      "Can not use both OAUTH_AUTH_ENDPOINT and ACCESS_API_KEY, please choose one.",
+    );
+  }
+
+  if (accessApiKey) {
+    return {
+      mode: "apiKey",
+      accessApiKey,
+    };
+  }
+
+  if (!oauthAuthorizationEndpoint || oauthAuthorizationEndpoint === "NONE") {
+    return {
+      mode: "none",
+    };
+  }
+
+  return {
+    mode: "oauth",
+    authorizationEndpoint: oauthAuthorizationEndpoint,
+    baseUrl: readRequiredEnv(env.OAUTH_BASE_URL, "OAUTH_BASE_URL"),
+    clientId: readRequiredEnv(env.OAUTH_CLIENT_ID, "OAUTH_CLIENT_ID"),
+    clientSecret: readRequiredEnv(env.OAUTH_CLIENT_SECRET, "OAUTH_CLIENT_SECRET"),
+    scopes: parseScopes(env.OAUTH_SCOPES),
+    tokenEndpoint: readRequiredEnv(env.OAUTH_TOKEN_ENDPOINT, "OAUTH_TOKEN_ENDPOINT"),
+  };
+}
+
+function readRequiredEnv(value: string | undefined, fieldName: string): string {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    throw new InvalidEnvConfigError(`${fieldName} is required`);
+  }
+
+  return trimmed;
+}
+
+function parseScopes(value: string | undefined): string[] {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return ["openid", "profile"];
+  }
+
+  return trimmed
+    .split(/[,\s]+/)
+    .map((scope) => scope.trim())
+    .filter((scope) => scope.length > 0);
 }

@@ -42,4 +42,93 @@ describe("loadConfig", () => {
 
     expect(config.registryDir).toBe("registry-data");
   });
+
+  test("defaults transport to stdio", () => {
+    const config = loadConfig({
+      CONTEXT_REGISTRY: "/tmp/context-registry",
+    });
+
+    expect(config.transportType).toBe("stdio");
+  });
+
+  test("requires OAUTH_AUTH_ENDPOINT to be set explicitly for httpStream", () => {
+    expect(() =>
+      loadConfig({
+        CONTEXT_REGISTRY: "/tmp/context-registry",
+        MCP_TRANSPORT: "httpStream",
+      }),
+    ).toThrow(
+      'OAUTH_AUTH_ENDPOINT or ACCESS_API_KEY is required when MCP_TRANSPORT=httpStream. Set to "OAUTH_AUTH_ENDPOINT=NONE" if you want leave your MCP server open.',
+    );
+  });
+
+  test("supports open httpStream mode when OAUTH_AUTH_ENDPOINT=NONE", () => {
+    const config = loadConfig({
+      CONTEXT_REGISTRY: "/tmp/context-registry",
+      MCP_TRANSPORT: "httpStream",
+      OAUTH_AUTH_ENDPOINT: "NONE",
+    });
+
+    expect(config.transportType).toBe("httpStream");
+    expect(config.auth).toEqual({ mode: "none" });
+  });
+
+  test("rejects configuring OAuth and API key auth together", () => {
+    expect(() =>
+      loadConfig({
+        ACCESS_API_KEY: "secret",
+        CONTEXT_REGISTRY: "/tmp/context-registry",
+        OAUTH_AUTH_ENDPOINT: "https://auth.example.com/oauth/authorize",
+      }),
+    ).toThrow("Can not use both OAUTH_AUTH_ENDPOINT and ACCESS_API_KEY, please choose one.");
+  });
+
+  test("loads API key auth when ACCESS_API_KEY is set", () => {
+    const config = loadConfig({
+      ACCESS_API_KEY: "secret",
+      CONTEXT_REGISTRY: "/tmp/context-registry",
+      OAUTH_AUTH_ENDPOINT: "NONE",
+    });
+
+    expect(config.auth).toEqual({
+      mode: "apiKey",
+      accessApiKey: "secret",
+    });
+  });
+
+  test("allows httpStream when ACCESS_API_KEY is set", () => {
+    const config = loadConfig({
+      ACCESS_API_KEY: "secret",
+      CONTEXT_REGISTRY: "/tmp/context-registry",
+      MCP_TRANSPORT: "httpStream",
+    });
+
+    expect(config.transportType).toBe("httpStream");
+    expect(config.auth).toEqual({
+      mode: "apiKey",
+      accessApiKey: "secret",
+    });
+  });
+
+  test("loads OAuth config when OAuth env vars are provided", () => {
+    const config = loadConfig({
+      CONTEXT_REGISTRY: "/tmp/context-registry",
+      OAUTH_AUTH_ENDPOINT: "https://auth.example.com/oauth/authorize",
+      OAUTH_BASE_URL: "https://mcp.example.com",
+      OAUTH_CLIENT_ID: "client-id",
+      OAUTH_CLIENT_SECRET: "client-secret",
+      OAUTH_SCOPES: "openid,profile email",
+      OAUTH_TOKEN_ENDPOINT: "https://auth.example.com/oauth/token",
+    });
+
+    expect(config.auth).toEqual({
+      mode: "oauth",
+      authorizationEndpoint: "https://auth.example.com/oauth/authorize",
+      baseUrl: "https://mcp.example.com",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      scopes: ["openid", "profile", "email"],
+      tokenEndpoint: "https://auth.example.com/oauth/token",
+    });
+  });
 });

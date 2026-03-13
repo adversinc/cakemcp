@@ -83,7 +83,7 @@ By default, the server starts with `stdio` transport.
 For remote mode:
 
 ```bash
-MCP_TRANSPORT=httpStream PORT=8080 bun run start
+MCP_TRANSPORT=httpStream OAUTH_AUTH_ENDPOINT=NONE PORT=8080 bun run start
 ```
 
 ## Environment Variables
@@ -106,12 +106,39 @@ MCP_TRANSPORT=httpStream PORT=8080 bun run start
   - repository cache TTL in seconds (default `300`)
 - `MCP_TRANSPORT` (optional)
   - `stdio` (default) or `httpStream`
+  - when using `httpStream`, `OAUTH_AUTH_ENDPOINT` must be set explicitly
 - `PORT`, `HOST` (optional)
   - used for `httpStream`
+- `OAUTH_AUTH_ENDPOINT` (optional, but required for `httpStream`)
+  - set to an OAuth authorization endpoint URL to enable FastMCP generic OAuth auth
+  - set to `NONE` to disable OAuth explicitly and leave the server open
+- `OAUTH_BASE_URL` (required when OAuth is enabled)
+  - public base URL of this MCP server, used for OAuth callback/proxy endpoints
+- `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` (required when OAuth is enabled)
+  - upstream OAuth client credentials
+- `OAUTH_TOKEN_ENDPOINT` (required when OAuth is enabled)
+  - upstream OAuth token endpoint URL
+- `OAUTH_SCOPES` (optional)
+  - space- or comma-separated scopes for the generic OAuth provider
+  - defaults to `openid profile`
+- `ACCESS_API_KEY` (optional)
+  - enables fixed API key auth via `x-api-key`
+  - cannot be used together with an enabled `OAUTH_AUTH_ENDPOINT`
 - `DEBUG_MCP` (optional)
   - set to `1` to enable `resolve_context` debug traces. Saves ouput summaries to `DEBUG_MCP_OUTPUT` file 
 - `DEBUG_MCP_OUTPUT` (optional)
   - output file path for debug traces (default `./output.log`)
+
+## MCP Access Auth
+
+All tools follow the same auth gate:
+- `OAUTH_AUTH_ENDPOINT=NONE` or unset on `stdio`: no auth required
+- `OAUTH_AUTH_ENDPOINT=<url>`: FastMCP generic OAuth provider is enabled and every tool uses `canAccess: requireAuth`
+- `ACCESS_API_KEY=<key>`: custom auth is enabled and every request must send `x-api-key: <key>`
+
+Invalid combinations:
+- `OAUTH_AUTH_ENDPOINT=<url>` together with `ACCESS_API_KEY` throws `Can not use both OAUTH_AUTH_ENDPOINT and ACCESS_API_KEY, please choose one.`
+- `MCP_TRANSPORT=httpStream` without `OAUTH_AUTH_ENDPOINT` and without `ACCESS_API_KEY` throws `OAUTH_AUTH_ENDPOINT or ACCESS_API_KEY is required when MCP_TRANSPORT=httpStream. Set to "OAUTH_AUTH_ENDPOINT=NONE" if you want leave your MCP server open.`
 
 ## Registry Layout
 

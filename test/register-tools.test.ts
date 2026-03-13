@@ -3,7 +3,7 @@ import { UserError } from "fastmcp";
 
 import { RegistryUnavailableError } from "../src/errors";
 import type { Logger } from "../src/logger";
-import { mapError } from "../src/tools/register-tools";
+import { mapError, registerTools } from "../src/tools/register-tools";
 
 function createMockLogger(): { logger: Logger; entries: Array<{ message: string; fields?: Record<string, unknown> }> } {
   const entries: Array<{ message: string; fields?: Record<string, unknown> }> = [];
@@ -39,5 +39,76 @@ describe("mapError", () => {
         error_details: undefined,
       },
     });
+  });
+});
+
+describe("registerTools", () => {
+  test("does not apply access control when auth is disabled", () => {
+    const tools: Array<Record<string, unknown>> = [];
+
+    registerTools(
+      {
+        addTool: (tool: Record<string, unknown>) => {
+          tools.push(tool);
+        },
+      } as never,
+      {
+        repository: {
+          listProjectIds: async () => [],
+          readLayer: async () => null,
+        } as never,
+        manifestLoader: {
+          load: async () => ({}),
+        } as never,
+        layerResolver: {
+          resolveContextWithDebug: async () => ({
+            debug: { cacheMisses: 0 },
+            result: {},
+          }),
+        } as never,
+        logger: createMockLogger().logger,
+        authRequired: false,
+      },
+    );
+
+    expect(tools).toHaveLength(4);
+    expect(tools.every((tool) => tool.canAccess === undefined)).toBe(true);
+  });
+
+  test("requires an authenticated session for all tools when auth is enabled", () => {
+    const tools: Array<Record<string, unknown>> = [];
+
+    registerTools(
+      {
+        addTool: (tool: Record<string, unknown>) => {
+          tools.push(tool);
+        },
+      } as never,
+      {
+        repository: {
+          listProjectIds: async () => [],
+          readLayer: async () => null,
+        } as never,
+        manifestLoader: {
+          load: async () => ({}),
+        } as never,
+        layerResolver: {
+          resolveContextWithDebug: async () => ({
+            debug: { cacheMisses: 0 },
+            result: {},
+          }),
+        } as never,
+        logger: createMockLogger().logger,
+        authRequired: true,
+      },
+    );
+
+    expect(tools).toHaveLength(4);
+
+    for (const tool of tools) {
+      expect(typeof tool.canAccess).toBe("function");
+      expect((tool.canAccess as (auth?: Record<string, unknown>) => boolean)(undefined)).toBe(false);
+      expect((tool.canAccess as (auth?: Record<string, unknown>) => boolean)({ id: 1 })).toBe(true);
+    }
   });
 });

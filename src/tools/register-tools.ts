@@ -1,6 +1,7 @@
-import { UserError, type FastMCP } from "fastmcp";
+import { UserError, requireAuth, type FastMCP } from "fastmcp";
 import { z } from "zod";
 
+import type { ServerSession } from "../auth";
 import { AppError, LayerNotFoundError } from "../errors";
 import type { Logger } from "../logger";
 import type { RegistryRepository } from "../registry/repository";
@@ -9,16 +10,20 @@ import type { ProjectManifestLoader } from "../services/manifest-loader";
 import type { McpDebugLogger } from "../debug/mcp-debug-logger";
 
 export function registerTools(
-  server: FastMCP,
+  server: FastMCP<ServerSession>,
   deps: {
     repository: RegistryRepository;
     manifestLoader: ProjectManifestLoader;
     layerResolver: LayerResolver;
     logger: Logger;
     debugLogger?: McpDebugLogger;
+    authRequired: boolean;
   },
 ): void {
-  const { repository, manifestLoader, layerResolver, logger, debugLogger } = deps;
+  const { repository, manifestLoader, layerResolver, logger, debugLogger, authRequired } = deps;
+  const canAccess = authRequired
+    ? ((auth: ServerSession | undefined) => requireAuth(auth))
+    : undefined;
 
   server.addTool({
     name: "resolve_context",
@@ -28,6 +33,7 @@ export function registerTools(
       destructiveHint: false,
       idempotentHint: true,
     },
+    ...(canAccess ? { canAccess } : {}),
     parameters: z.object({
       project_id: z.string().min(1),
       task_type: z.string().optional(),
@@ -66,6 +72,7 @@ export function registerTools(
       destructiveHint: false,
       idempotentHint: true,
     },
+    ...(canAccess ? { canAccess } : {}),
     execute: async () => {
       try {
         const projectIds = await repository.listProjectIds();
@@ -84,6 +91,7 @@ export function registerTools(
       destructiveHint: false,
       idempotentHint: true,
     },
+    ...(canAccess ? { canAccess } : {}),
     parameters: z.object({
       project_id: z.string().min(1),
     }),
@@ -105,6 +113,7 @@ export function registerTools(
       destructiveHint: false,
       idempotentHint: true,
     },
+    ...(canAccess ? { canAccess } : {}),
     parameters: z.object({
       type: z.enum(["global", "language", "framework", "project"]),
       name: z.string().min(1),
