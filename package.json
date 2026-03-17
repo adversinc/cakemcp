@@ -1,8 +1,19 @@
 {
   "name": "cakemcp",
+  "version": "0.1.0",
+  "description": "MCP server for centrally distributing multiple projects context to coding agents.",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "license": "MIT",
+  "homepage": "https://github.com/adversinc/cakemcp",
+  "bugs": {
+    "url": "https://github.com/adversinc/cakemcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adversinc/cakemcp.git"
+  },
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "NODE_ENV=development bun run --watch src/index.ts",
