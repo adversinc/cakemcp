@@ -47,7 +47,7 @@ export async function buildServer() {
   const server = new FastMCP<ServerSession>({
     name: "cakemcp",
     version: "0.1.1",
-    ...buildAuthOptions(config),
+    ...buildAuthOptions(config, logger),
   });
 
   registerTools(server, {

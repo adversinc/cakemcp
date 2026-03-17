@@ -3,6 +3,7 @@ import type { IncomingMessage } from "node:http";
 import { OAuthProvider, type ServerOptions } from "fastmcp";
 
 import type { AppConfig } from "./config";
+import type { Logger } from "./logger";
 
 export type ApiKeySession = {
   authType: "api-key";
@@ -21,6 +22,7 @@ export type ServerSession = ApiKeySession | OAuthServerSession;
 
 export function buildAuthOptions(
   config: AppConfig,
+  logger: Logger,
 ): Pick<ServerOptions<ServerSession>, "authenticate" | "oauth"> {
   if (config.auth.mode === "oauth") {
     const provider = new OAuthProvider<OAuthServerSession>({
@@ -62,6 +64,8 @@ export function buildAuthOptions(
         const apiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
 
         if (apiKey !== accessApiKey) {
+          logger.warn("API key authentication failed", {
+          });
           throw new Response(null, {
             status: 401,
             statusText: "Unauthorized",
