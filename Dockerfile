@@ -1,5 +1,8 @@
 FROM oven/bun:1-slim AS base
 WORKDIR /usr/src/app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 # install dependencies into temp directory
 # this will cache them and speed up future builds
