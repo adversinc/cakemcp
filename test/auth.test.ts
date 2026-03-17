@@ -118,8 +118,6 @@ describe("buildAuthOptions", () => {
       {
         message: "API key authentication failed",
         fields: {
-          expected_api_key: "secret",
-          received_api_key: "wrong",
         },
       },
     ]);
