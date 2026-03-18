@@ -50,7 +50,7 @@ describe("buildAuthOptions", () => {
 		expect(buildAuthOptions(createBaseConfig(), logger)).toEqual({});
 	});
 
-	test("builds OAuth authenticate and oauth config when oauth mode is enabled", () => {
+	test("builds OAuth provider config when oauth mode is enabled", () => {
 		const { logger } = createMockLogger();
 		const options = buildAuthOptions(
 			{
@@ -68,7 +68,7 @@ describe("buildAuthOptions", () => {
 			logger,
 		);
 
-		expect(typeof options.authenticate).toBe("function");
+		expect(options.authenticate).toBeUndefined();
 		expect(options.auth).toBeDefined();
 	});
 

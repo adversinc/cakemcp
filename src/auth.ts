@@ -28,7 +28,6 @@ export function buildAuthOptions(
 	logger: Logger,
 ): Pick<ServerOptions<ServerSession>, "authenticate" | "auth"> {
 	if(config.auth.mode === "oauth") {
-		console.log("endpoint:", config.auth.authorizationEndpoint);
 		const provider = new OAuthProvider<OAuthServerSession>({
 			authorizationEndpoint: config.auth.authorizationEndpoint,
 			baseUrl: config.auth.baseUrl,
@@ -39,7 +38,6 @@ export function buildAuthOptions(
 		});
 
 		return {
-
 			auth: provider,
 		};
 	}
