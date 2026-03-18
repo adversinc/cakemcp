@@ -17,6 +17,8 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "NODE_ENV=development bun run --watch src/index.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
   },
@@ -26,8 +28,12 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "latest",
-    "@types/node": "^25.3.5"
+    "@types/node": "^25.3.5",
+    "eslint": "^10.0.3",
+    "eslint-plugin-jsdoc": "^62.8.0",
+    "typescript-eslint": "^8.57.1"
   },
   "peerDependencies": {
     "typescript": "^5"

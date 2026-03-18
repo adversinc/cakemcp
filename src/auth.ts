@@ -6,78 +6,67 @@ import type { AppConfig } from "./config";
 import type { Logger } from "./logger";
 
 export type ApiKeySession = {
-  authType: "api-key";
+	authType: "api-key";
 };
 
 export type OAuthServerSession = Record<string, unknown> & {
-  accessToken: string;
-  claims?: Record<string, unknown>;
-  expiresAt?: number;
-  idToken?: string;
-  refreshToken?: string;
-  scopes?: string[];
+	accessToken: string;
+	claims?: Record<string, unknown>;
+	expiresAt?: number;
+	idToken?: string;
+	refreshToken?: string;
+	scopes?: string[];
 };
 
 export type ServerSession = ApiKeySession | OAuthServerSession;
 
+/**
+ * Builds the FastMCP auth hooks for the configured authentication mode.
+ */
 export function buildAuthOptions(
-  config: AppConfig,
-  logger: Logger,
-): Pick<ServerOptions<ServerSession>, "authenticate" | "oauth"> {
-  if (config.auth.mode === "oauth") {
-    const provider = new OAuthProvider<OAuthServerSession>({
-      authorizationEndpoint: config.auth.authorizationEndpoint,
-      baseUrl: config.auth.baseUrl,
-      clientId: config.auth.clientId,
-      clientSecret: config.auth.clientSecret,
-      scopes: config.auth.scopes,
-      tokenEndpoint: config.auth.tokenEndpoint,
-    });
+	config: AppConfig,
+	logger: Logger,
+): Pick<ServerOptions<ServerSession>, "authenticate" | "auth"> {
+	if(config.auth.mode === "oauth") {
+		console.log("endpoint:", config.auth.authorizationEndpoint);
+		const provider = new OAuthProvider<OAuthServerSession>({
+			authorizationEndpoint: config.auth.authorizationEndpoint,
+			baseUrl: config.auth.baseUrl,
+			clientId: config.auth.clientId,
+			clientSecret: config.auth.clientSecret,
+			scopes: config.auth.scopes,
+			tokenEndpoint: config.auth.tokenEndpoint,
+		});
 
-    return {
-      authenticate: async (request: IncomingMessage) => {
-        try {
-          const session = await provider.authenticate(request);
+		return {
 
-          if (!session) {
-            throw new Response(null, {
-              status: 401,
-              statusText: "Unauthorized",
-            });
-          }
+			auth: provider,
+		};
+	}
 
-          return session;
-        } catch (error) {
-          throw error;
-        }
-      },
-      oauth: provider.getOAuthConfig(),
-    };
-  }
+	if(config.auth.mode === "apiKey") {
+		const { accessApiKey } = config.auth;
 
-  if (config.auth.mode === "apiKey") {
-    const { accessApiKey } = config.auth;
+		return {
+			authenticate: async (request: IncomingMessage) => {
+				const apiKeyHeader = request.headers["x-api-key"];
+				const apiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
 
-    return {
-      authenticate: async (request: IncomingMessage) => {
-        const apiKeyHeader = request.headers["x-api-key"];
-        const apiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
+				if(apiKey !== accessApiKey) {
+					logger.warn("API key authentication failed", {
+					});
+					throw new Response(null, {
+						status: 401,
+						statusText: "Unauthorized",
+					});
+				}
 
-        if (apiKey !== accessApiKey) {
-          logger.warn("API key authentication failed", {
-          });
-          throw new Response(null, {
-            status: 401,
-            statusText: "Unauthorized",
-          });
-        }
+				return {
+					authType: "api-key",
+				};
+			},
+		};
+	}
 
-        return {
-          authType: "api-key",
-        };
-      },
-    };
-  }
-
-  return {};
+	return {};
 }

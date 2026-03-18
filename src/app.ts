@@ -13,54 +13,60 @@ import { ProjectManifestLoader } from "./services/manifest-loader";
 import { registerTools } from "./tools/register-tools";
 import { isGitUrl } from "./utils/registry";
 
+/**
+ * Builds the MCP server, registry dependencies, and tool registrations from env config.
+ */
 export async function buildServer() {
-  const config = loadConfig();
-  const logger = createLogger("cakemcp");
+	const config = loadConfig();
+	const logger = createLogger("cakemcp");
 
-  const provider: RegistryProvider = isGitUrl(config.contextRegistry)
-    ? new GitRegistryProvider(
-        config.contextRegistry,
-        config.registryDir,
-        config.cacheExpirySeconds,
-        config.registryKey,
-        logger,
-      )
-    : new LocalRegistryProvider(config.contextRegistry, config.registryDir, logger);
+	const provider: RegistryProvider = isGitUrl(config.contextRegistry) ?
+		new GitRegistryProvider(
+			config.contextRegistry,
+			config.registryDir,
+			config.cacheExpirySeconds,
+			config.registryKey,
+			logger,
+		) :
+		new LocalRegistryProvider(config.contextRegistry, config.registryDir, logger);
 
-  logger.info("Startup config", {
-    provider: provider.type,
-    registry_dir: config.registryDir,
-    cache_expiry_seconds: config.cacheExpirySeconds,
-    transport: config.transportType,
-    http_port: config.httpPort,
-    has_registry_key: Boolean(config.registryKey),
-    auth_mode: config.auth.mode,
-    debug_mcp: config.debugMcp,
-    debug_output_path: config.debugMcpOutputPath,
-  });
+	logger.info("Startup config", {
+		provider: provider.type,
+		registry_dir: config.registryDir,
+		cache_expiry_seconds: config.cacheExpirySeconds,
+		transport: config.transportType,
+		http_port: config.httpPort,
+		has_registry_key: Boolean(config.registryKey),
+		auth_mode: config.auth.mode,
+		debug_mcp: config.debugMcp,
+		debug_output_path: config.debugMcpOutputPath,
+	});
 
-  const repository = new RegistryRepository(provider, config.cacheExpirySeconds, logger);
-  const manifestLoader = new ProjectManifestLoader(repository);
-  const layerResolver = new LayerResolver(repository, manifestLoader, logger);
-  const debugLogger = config.debugMcp ? new McpDebugLogger(config.debugMcpOutputPath) : undefined;
+	const repository = new RegistryRepository(provider, config.cacheExpirySeconds, logger);
+	const manifestLoader = new ProjectManifestLoader(repository);
+	const layerResolver = new LayerResolver(repository, manifestLoader, logger);
+	const debugLogger = config.debugMcp ? new McpDebugLogger(config.debugMcpOutputPath) : undefined;
 
-  const server = new FastMCP<ServerSession>({
-    name: "cakemcp",
-    version: "0.1.1",
-    ...buildAuthOptions(config, logger),
-  });
+	const authOptions = buildAuthOptions(config, logger);
+	//console.log("authOptions:", authOptions);
 
-  registerTools(server, {
-    repository,
-    manifestLoader,
-    layerResolver,
-    logger,
-    debugLogger,
-    authRequired: config.auth.mode !== "none",
-  });
+	const server = new FastMCP<ServerSession>({
+		name: "cakemcp",
+		version: "0.2.0",
+		...authOptions,
+	});
 
-  return {
-    config,
-    server,
-  };
+	registerTools(server, {
+		repository,
+		manifestLoader,
+		layerResolver,
+		logger,
+		debugLogger,
+		authRequired: config.auth.mode !== "none",
+	});
+
+	return {
+		config,
+		server,
+	};
 }
