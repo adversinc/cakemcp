@@ -22,9 +22,10 @@ export function registerTools(
 		logger: Logger;
 		debugLogger?: McpDebugLogger;
 		authRequired: boolean;
+		authMode: "none" | "apiKey" | "oauth";
 	},
 ): void {
-	const { repository, manifestLoader, layerResolver, logger, debugLogger, authRequired } = deps;
+	const { repository, manifestLoader, layerResolver, logger, debugLogger, authRequired, authMode } = deps;
 
 	const canAccess = authRequired ?
 		((auth: ServerSession | undefined) => {
@@ -37,6 +38,10 @@ export function registerTools(
 					reason: "authentication_required",
 				});
 				return false;
+			}
+
+			if(authMode !== "oauth") {
+				return true;
 			}
 
 			return hasRequiredRole(auth as Extract<ServerSession, { idToken?: string }>, logger);
@@ -58,7 +63,7 @@ export function registerTools(
 			path: z.string().optional(),
 			changed_files: z.array(z.string()).optional(),
 		}),
-		execute: async (args, context) => {
+		execute: withToolExecutionLogging(logger, "resolve_context", async (args, context) => {
 			const startedAt = Date.now();
 
 			try {
@@ -79,7 +84,7 @@ export function registerTools(
 			} catch (error) {
 				throw mapError(error, logger);
 			}
-		},
+		}),
 	});
 
 	server.addTool({
@@ -91,14 +96,14 @@ export function registerTools(
 			idempotentHint: true,
 		},
 		...(canAccess ? { canAccess } : {}),
-		execute: async () => {
+		execute: withToolExecutionLogging(logger, "list_projects", async () => {
 			try {
 				const projectIds = await repository.listProjectIds();
 				return JSON.stringify({ project_ids: projectIds }, null, 2);
 			} catch (error) {
 				throw mapError(error, logger);
 			}
-		},
+		}),
 	});
 
 	server.addTool({
@@ -113,14 +118,14 @@ export function registerTools(
 		parameters: z.object({
 			project_id: z.string().min(1),
 		}),
-		execute: async ({ project_id }) => {
+		execute: withToolExecutionLogging(logger, "get_project_manifest", async ({ project_id }) => {
 			try {
 				const manifest = await manifestLoader.load(project_id);
 				return JSON.stringify(manifest, null, 2);
 			} catch (error) {
 				throw mapError(error, logger);
 			}
-		},
+		}),
 	});
 
 	server.addTool({
@@ -136,7 +141,7 @@ export function registerTools(
 			type: z.enum(["global", "language", "framework", "project"]),
 			name: z.string().min(1),
 		}),
-		execute: async ({ type, name }) => {
+		execute: withToolExecutionLogging(logger, "get_layer", async ({ type, name }) => {
 			try {
 				const layer = await repository.readLayer(type, name);
 				if(!layer) {
@@ -156,8 +161,51 @@ export function registerTools(
 			} catch (error) {
 				throw mapError(error, logger);
 			}
-		},
+		}),
 	});
+}
+
+type ToolContext = {
+	requestId?: string;
+};
+
+type ToolExecutor<TArgs, TResult> = (args: TArgs, context: ToolContext) => Promise<TResult>;
+
+function withToolExecutionLogging<TArgs, TResult>(
+	logger: Logger,
+	toolName: string,
+	execute: ToolExecutor<TArgs, TResult>,
+): ToolExecutor<TArgs, TResult> {
+	return async (args: TArgs, context: ToolContext) => {
+		const startedAt = Date.now();
+		const requestId = context.requestId ?? "unknown";
+
+		logger.info("Tool execution started", {
+			tool_name: toolName,
+			request_id: requestId,
+			args,
+		});
+
+		try {
+			const result = await execute(args, context);
+
+			logger.info("Tool execution completed", {
+				tool_name: toolName,
+				request_id: requestId,
+				duration_ms: Date.now() - startedAt,
+			});
+
+			return result;
+		} catch (error) {
+			logger.error("Tool execution failed", {
+				tool_name: toolName,
+				request_id: requestId,
+				duration_ms: Date.now() - startedAt,
+				error_message: error instanceof Error ? error.message : String(error),
+			});
+			throw error;
+		}
+	};
 }
 
 /**

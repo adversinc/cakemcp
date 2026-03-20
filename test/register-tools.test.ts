@@ -221,6 +221,7 @@ describe("registerTools", () => {
 				} as never,
 				logger: createMockLogger().logger,
 				authRequired: false,
+				authMode: "none",
 			},
 		);
 
@@ -253,6 +254,7 @@ describe("registerTools", () => {
 				} as never,
 				logger: createMockLogger().logger,
 				authRequired: true,
+				authMode: "apiKey",
 			},
 		);
 
@@ -297,6 +299,7 @@ describe("registerTools", () => {
 						} as never,
 						logger,
 						authRequired: true,
+						authMode: "oauth",
 					},
 				);
 			},
@@ -368,6 +371,7 @@ describe("registerTools", () => {
 						} as never,
 						logger,
 						authRequired: true,
+						authMode: "oauth",
 					},
 				);
 			},
@@ -394,5 +398,189 @@ describe("registerTools", () => {
 				}
 			},
 		);
+	});
+
+	test("skips role checks for apiKey auth even when oauth role env is configured", () => {
+		const tools: Array<Record<string, unknown>> = [];
+		const { entries, logger } = createMockLogger();
+
+		withEnv(
+			{
+				OAUTH_REQUIRED_ROLE: "admin",
+				OAUTH_ROLE_CLAIM_PATH: "realm_access",
+			},
+			() => {
+				registerTools(
+					{
+						addTool: (tool: Record<string, unknown>) => {
+							tools.push(tool);
+						},
+					} as never,
+					{
+						repository: {
+							listProjectIds: async () => [],
+							readLayer: async () => null,
+						} as never,
+						manifestLoader: {
+							load: async () => ({}),
+						} as never,
+						layerResolver: {
+							resolveContextWithDebug: async () => ({
+								debug: { cacheMisses: 0 },
+								result: {},
+							}),
+						} as never,
+						logger,
+						authRequired: true,
+						authMode: "apiKey",
+					},
+				);
+			},
+		);
+
+		for(const tool of tools) {
+			expect(typeof tool.canAccess).toBe("function");
+			expect((tool.canAccess as(auth?: Record<string, unknown>) => boolean)({ id: 1 })).toBe(true);
+		}
+
+		expect(entries.some((entry) => entry.message === "Role access check started")).toBe(false);
+	});
+
+	test("logs tool execution start and completion for successful calls", async () => {
+		const tools: Array<Record<string, unknown>> = [];
+		const { entries, logger } = createMockLogger();
+
+		registerTools(
+			{
+				addTool: (tool: Record<string, unknown>) => {
+					tools.push(tool);
+				},
+			} as never,
+			{
+				repository: {
+					listProjectIds: async () => ["billing-service"],
+					readLayer: async () => null,
+				} as never,
+				manifestLoader: {
+					load: async () => ({}),
+				} as never,
+				layerResolver: {
+					resolveContextWithDebug: async () => ({
+						debug: { cacheMisses: 0 },
+						result: {},
+					}),
+				} as never,
+				logger,
+				authRequired: false,
+				authMode: "none",
+			},
+		);
+
+		const listProjectsTool = tools.find((tool) => tool.name === "list_projects");
+		expect(listProjectsTool).toBeDefined();
+
+		const result = await (listProjectsTool?.execute as(args: undefined, context: { requestId?: string }) => Promise<string>)(
+			undefined,
+			{ requestId: "req-1" },
+		);
+
+		expect(result).toBe(JSON.stringify({ project_ids: ["billing-service"] }, null, 2));
+		expect(entries).toEqual([
+			{
+				level: "info",
+				message: "Tool execution started",
+				fields: {
+					tool_name: "list_projects",
+					request_id: "req-1",
+					args: undefined,
+				},
+			},
+			{
+				level: "info",
+				message: "Tool execution completed",
+				fields: {
+					tool_name: "list_projects",
+					request_id: "req-1",
+					duration_ms: expect.any(Number),
+				},
+			},
+		]);
+	});
+
+	test("logs tool execution failure when a tool throws", async () => {
+		const tools: Array<Record<string, unknown>> = [];
+		const { entries, logger } = createMockLogger();
+
+		registerTools(
+			{
+				addTool: (tool: Record<string, unknown>) => {
+					tools.push(tool);
+				},
+			} as never,
+			{
+				repository: {
+					listProjectIds: async () => [],
+					readLayer: async () => null,
+				} as never,
+				manifestLoader: {
+					load: async () => {
+						throw new RegistryUnavailableError("Registry cache is unavailable");
+					},
+				} as never,
+				layerResolver: {
+					resolveContextWithDebug: async () => ({
+						debug: { cacheMisses: 0 },
+						result: {},
+					}),
+				} as never,
+				logger,
+				authRequired: false,
+				authMode: "none",
+			},
+		);
+
+		const getProjectManifestTool = tools.find((tool) => tool.name === "get_project_manifest");
+		expect(getProjectManifestTool).toBeDefined();
+
+		await expect(
+			(getProjectManifestTool?.execute as(args: { project_id: string }, context: { requestId?: string }) => Promise<string>)(
+				{ project_id: "billing-service" },
+				{ requestId: "req-2" },
+			),
+		).rejects.toBeInstanceOf(UserError);
+
+		expect(entries).toEqual([
+			{
+				level: "info",
+				message: "Tool execution started",
+				fields: {
+					tool_name: "get_project_manifest",
+					request_id: "req-2",
+					args: {
+						project_id: "billing-service",
+					},
+				},
+			},
+			{
+				level: "error",
+				message: "Tool execution failed",
+				fields: {
+					error_code: "registry_unavailable",
+					error_name: "RegistryUnavailableError",
+					error_message: "Registry cache is unavailable",
+					error_details: undefined,
+				},
+			},
+			{
+				level: "error",
+				message: "Tool execution failed",
+				fields: {
+					tool_name: "get_project_manifest",
+					request_id: "req-2",
+					duration_ms: expect.any(Number),
+					error_message: "[registry_unavailable] Registry cache is unavailable",
+				},
+			},
+		]);
 	});
 });

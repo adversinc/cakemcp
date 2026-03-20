@@ -52,7 +52,7 @@ export async function buildServer() {
 
 	const server = new FastMCP<ServerSession>({
 		name: "cakemcp",
-		version: "0.2.0",
+		version: "0.2.1",
 		...authOptions,
 	});
 
@@ -63,6 +63,7 @@ export async function buildServer() {
 		logger,
 		debugLogger,
 		authRequired: config.auth.mode !== "none",
+		authMode: config.auth.mode,
 	});
 
 	return {
