@@ -32,7 +32,64 @@ Stack:
 - Bun runtime
 - [`punkpeye/fastmcp`](https://github.com/punkpeye/fastmcp)
 
-## Example usage
+## Installation and usage
+
+### Local run
+
+```bash
+bun install
+cp .env.example .env
+bun run start
+```
+
+By default, the server starts with `stdio` transport.
+
+### Network (HTTP) usage
+
+For remote mode set env:
+
+```bash
+MCP_TRANSPORT=httpStream ACCESS_API_KEY=1111 PORT=8080 bun run start
+```
+
+### Jetbrains AI Assistant
+
+Jetbrains AI Assistant settings contain MCP servers list. Depending on your
+deployment add STDIO or HTTP server.
+
+HTTP servers can be used with API key authentication:
+
+```
+{
+  "mcpServers": {
+    "your_server_name": {
+      "url": "https://localhost:8080",
+      "headers": {
+        "X-API-Key": "...."
+      }
+    }
+  }
+}
+```
+
+### Codex CLI
+
+Codex CLI also supports OAuth authentication. 
+
+1. Add your server to ~/.codex/config.toml:
+
+[mcp_servers.your_server_name]
+url = "https://<domain-name>/mcp"
+oauth_resource = "https//<domain-name>"
+
+As for 2026-03-20 the `oauth_resource` is required because Codex does not
+provide "resource" URL parameter properly due to the bug.
+
+2. Login to your MCP:
+
+```codex mcp login your_server_name```
+
+### Example data
 
 The `demo-data` folders are intended to show example usage for three projects:
 - frontend, written in TypeScript + MeteorJS
@@ -69,22 +126,6 @@ repository instead.
 - no UI/admin/auth platform
 - no heavy enterprise abstractions
 - tool output is returned as a JSON string (MCP-client friendly)
-
-## Run
-
-```bash
-bun install
-cp .env.example .env
-bun run start
-```
-
-By default, the server starts with `stdio` transport.
-
-For remote mode:
-
-```bash
-MCP_TRANSPORT=httpStream OAUTH_AUTH_ENDPOINT=NONE PORT=8080 bun run start
-```
 
 ## Environment Variables
 
