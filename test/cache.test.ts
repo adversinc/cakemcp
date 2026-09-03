@@ -33,4 +33,27 @@ describe("RegistryRepository cache", () => {
 		const third = await repository.readLayer("global", "formatting");
 		expect(third?.content).toBe("v2");
 	});
+
+	test("evicts the least recently used file when the cache reaches its limit", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "advers-mcp-cache-limit-test-"));
+		await mkdir(path.join(root, "layers", "global"), { recursive: true });
+		await mkdir(path.join(root, "projects"), { recursive: true });
+
+		const firstLayerPath = path.join(root, "layers", "global", "first.md");
+		await writeFile(firstLayerPath, "v1", "utf8");
+		await writeFile(path.join(root, "layers", "global", "second.md"), "second", "utf8");
+		await writeFile(path.join(root, "layers", "global", "third.md"), "third", "utf8");
+
+		const logger = createLogger("test-cache-limit");
+		const provider = new LocalRegistryProvider(root, ".", logger);
+		const repository = new RegistryRepository(provider, 60, logger, 2);
+
+		await repository.readLayer("global", "first");
+		await repository.readLayer("global", "second");
+		await repository.readLayer("global", "third");
+		await writeFile(firstLayerPath, "v2", "utf8");
+
+		const reloaded = await repository.readLayer("global", "first");
+		expect(reloaded?.content).toBe("v2");
+	});
 });

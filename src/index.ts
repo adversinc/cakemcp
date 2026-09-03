@@ -1,17 +1,6 @@
 import { buildServer } from "./app";
+import { buildServerStartOptions } from "./server-start-options";
 
 const { config, server } = await buildServer();
 
-if(config.transportType === "httpStream") {
-	await server.start({
-		transportType: "httpStream",
-		httpStream: {
-			host: config.httpHost,
-			port: config.httpPort,
-		},
-	});
-} else {
-	await server.start({
-		transportType: "stdio",
-	});
-}
+await server.start(buildServerStartOptions(config));

@@ -12,16 +12,24 @@ export type RequestCacheStats = {
 	misses: number;
 };
 
+const DEFAULT_MAX_FILE_CACHE_ENTRIES = 256;
+
 export class RegistryRepository {
 	private readonly projectsCache: TimedCache<string[]>;
 	private readonly fileCache = new Map<string, TimedCache<string>>();
 	private readonly fileCacheTtlMs: number;
 
+	/** Creates a repository with a bounded per-file content cache. */
 	constructor(
 		private readonly provider: RegistryProvider,
 		cacheExpirySeconds: number,
 		private readonly logger: Logger,
+		private readonly maxFileCacheEntries = DEFAULT_MAX_FILE_CACHE_ENTRIES,
 	) {
+		if(!Number.isInteger(maxFileCacheEntries) || maxFileCacheEntries <= 0) {
+			throw new Error("maxFileCacheEntries must be a positive integer");
+		}
+
 		const ttlMs = cacheExpirySeconds * 1000;
 		this.projectsCache = new TimedCache<string[]>(ttlMs);
 		this.fileCacheTtlMs = ttlMs;
@@ -112,7 +120,7 @@ export class RegistryRepository {
 	 *
 	 */
 	private async readOptionalFile(filePath: string, cacheStats?: RequestCacheStats): Promise<string | null> {
-		const cache = this.fileCache.get(filePath) ?? this.newFileCache(filePath);
+		const cache = this.getFileCache(filePath);
 
 		try {
 			const { value, status } = await cache.getOrLoadWithStatus(async () => {
@@ -132,6 +140,26 @@ export class RegistryRepository {
 		} catch{
 			return null;
 		}
+	}
+
+	/** Returns a cached file loader and refreshes its LRU position. */
+	private getFileCache(filePath: string): TimedCache<string> {
+		const existing = this.fileCache.get(filePath);
+		if(existing) {
+			// Refresh insertion order so the Map also acts as a small LRU cache.
+			this.fileCache.delete(filePath);
+			this.fileCache.set(filePath, existing);
+			return existing;
+		}
+
+		if(this.fileCache.size >= this.maxFileCacheEntries) {
+			const oldestFilePath = this.fileCache.keys().next().value;
+			if(oldestFilePath !== undefined) {
+				this.fileCache.delete(oldestFilePath);
+			}
+		}
+
+		return this.newFileCache(filePath);
 	}
 
 	private newFileCache(filePath: string): TimedCache<string> {
