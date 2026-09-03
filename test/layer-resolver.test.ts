@@ -27,11 +27,21 @@ describe("LayerResolver", () => {
 
 		expect(result.project_id).toBe("billing-service");
 		expect(result.project_name).toBe("billing-service");
-		expect(result.resolved_layers.length).toBe(7);
+		expect(result.resolved_layers.length).toBe(8);
 		expect(result.merged_content).toContain("# Layer: global/formatting");
+		expect(result.merged_content).toContain("# Layer: domain/commerce");
 		expect(result.merged_content).toContain("# Layer: project/billing-service");
 		expect(result.warnings).toEqual(["Layer not found in manifest: project/missing-project-layer"]);
-		expect(result.resolved_layers.map((layer) => layer.priority)).toEqual([100, 101, 200, 300, 301, 400, 401]);
+		expect(result.resolved_layers.map((layer) => layer.priority)).toEqual([
+			100,
+			101,
+			200,
+			300,
+			301,
+			400,
+			500,
+			501,
+		]);
 		for(const layer of result.resolved_layers) {
 			expect(layer.revision).toMatch(/^\d+$/);
 		}
@@ -49,6 +59,7 @@ describe("LayerResolver", () => {
 			"language/typescript",
 			"framework/nextjs",
 			"framework/bun",
+			"domain/commerce",
 			"project/payment-rules",
 			"project/billing-service",
 		]);

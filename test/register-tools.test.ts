@@ -196,6 +196,43 @@ describe("hasRequiredRole", () => {
 });
 
 describe("registerTools", () => {
+	test("get_layer accepts the domain layer type", () => {
+		const tools: Array<Record<string, unknown>> = [];
+
+		registerTools(
+			{
+				addTool: (tool: Record<string, unknown>) => {
+					tools.push(tool);
+				},
+			} as never,
+			{
+				repository: {
+					listProjectIds: async () => [],
+					readLayer: async () => null,
+				} as never,
+				manifestLoader: {
+					load: async () => ({}),
+				} as never,
+				layerResolver: {
+					resolveContextWithDebug: async () => ({
+						debug: { cacheMisses: 0 },
+						result: {},
+					}),
+				} as never,
+				logger: createMockLogger().logger,
+				authRequired: false,
+				authMode: "none",
+			},
+		);
+
+		const getLayerTool = tools.find((tool) => tool.name === "get_layer");
+		const parameters = getLayerTool?.parameters as {
+			safeParse: (value: unknown) => { success: boolean };
+		};
+
+		expect(parameters.safeParse({ type: "domain", name: "commerce" }).success).toBe(true);
+	});
+
 	test("does not apply access control when auth is disabled", () => {
 		const tools: Array<Record<string, unknown>> = [];
 

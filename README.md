@@ -16,6 +16,7 @@ The knowledge base is split into layers:
 - global agreements
 - language-specific rules
 - framework-related instructions and agreements
+- domain-level rules shared by projects in the same business or product area
 - project-level specifics
 
 Layers are stored together to make de-duplication and sharing easier across projects, including AI-assisted maintenance 
@@ -189,6 +190,7 @@ layers/ - layer markdown files
 layers/global/*.md
 layers/language/*.md
 layers/framework/*.md
+layers/domain/*.md
 layers/project/*.md
 ```
 
@@ -210,6 +212,8 @@ layers:
   framework:
     - nextjs
     - bun
+  domain:
+    - commerce
   project:
     - billing-service # This is actually redundant, layers/project/billing-service.md is auto-added
     - payment-rules
@@ -218,6 +222,7 @@ layers:
 Rules:
 - `name` is optional (defaults to `project_id` if missing)
 - `layers.*` are optional
+- `layers.domain` lists thematic layers shared by a family of related projects; domain layers are not auto-added
 - project manifest is resolved by project_id from `projects/${project_id}.yaml`
 - auto-layer is always attempted as `layers/project/${name}.md` (even if not specified in `manifest.project`)
 
@@ -237,6 +242,7 @@ Behavior:
    - `global`
    - `language`
    - `framework`
+   - `domain`
    - `project` (from manifest)
 3. Always tries to append `layers/project/${projectName}.md`
 4. Merges markdown into `merged_content` with layer separators
@@ -329,6 +335,7 @@ layers=[
   global/formatting.md,
   language/typescript.md,
   framework/nextjs.md,
+  domain/commerce.md,
   project/payment-rules.md,
   project/billing-service.md
 ]

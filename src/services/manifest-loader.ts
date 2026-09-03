@@ -4,7 +4,7 @@ import { ManifestParseError, ProjectNotFoundError } from "../errors";
 import type { RegistryRepository, RequestCacheStats } from "../registry/repository";
 import type { LayerType, ProjectManifest } from "../types";
 
-const LAYER_TYPES: LayerType[] = ["global", "language", "framework", "project"];
+const LAYER_TYPES: LayerType[] = ["global", "language", "framework", "domain", "project"];
 
 export type LoadedManifest = {
 	projectId: string;
