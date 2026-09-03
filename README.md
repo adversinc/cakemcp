@@ -279,13 +279,16 @@ Returns raw layer content.
 
 ### Error Handling and Degradation
 
-`resolve_context` does not fail because of a missing optional layer from the manifest:
-- missing layer is added to `warnings`
-
-`resolve_context` fails only when:
-- project is not found
-- registry is unavailable and no cache is available
-- manifest is invalid
+`resolve_context` degrades gracefully when instructions cannot be built
+completely:
+- missing or unreadable layers are added to `warnings`, while available layers
+  are still returned
+- project, manifest, registry, and unexpected generation errors return an empty
+  partial result with `warnings`
+- every generation error is appended to `merged_content` under
+  `# Instruction generation errors`
+- the appended instruction tells the agent to notify the user about the named
+  knowledge MCP server and lists every error
 
 Git provider behavior:
 - stores a local checkout in a temp cache directory

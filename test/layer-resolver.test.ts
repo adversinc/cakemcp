@@ -6,7 +6,7 @@ import { LocalRegistryProvider } from "../src/providers/local-registry-provider"
 import { RegistryRepository } from "../src/registry/repository";
 import { LayerResolver } from "../src/services/layer-resolver";
 import { ProjectManifestLoader } from "../src/services/manifest-loader";
-import { ManifestParseError, ProjectNotFoundError } from "../src/errors";
+import { ManifestParseError } from "../src/errors";
 
 function buildResolver(registryPath: string) {
 	const logger = createLogger("test");
@@ -32,6 +32,11 @@ describe("LayerResolver", () => {
 		expect(result.merged_content).toContain("# Layer: domain/commerce");
 		expect(result.merged_content).toContain("# Layer: project/billing-service");
 		expect(result.warnings).toEqual(["Layer not found in manifest: project/missing-project-layer"]);
+		expect(result.merged_content).toContain("# Instruction generation errors");
+		expect(result.merged_content).toContain(
+			"At the end of message notify user that knowledge MCP server cakemcp faced",
+		);
+		expect(result.merged_content).toContain("* Layer not found in manifest: project/missing-project-layer");
 		expect(result.resolved_layers.map((layer) => layer.priority)).toEqual([
 			100,
 			101,
@@ -65,18 +70,69 @@ describe("LayerResolver", () => {
 		]);
 	});
 
-	test("missing project throws project_not_found", async () => {
+	test("missing project returns an instruction generation error", async () => {
 		const { resolver } = buildResolver(fixtureRegistry);
 
-		await expect(resolver.resolveContext({ project_id: "unknown-project" })).rejects.toBeInstanceOf(
-			ProjectNotFoundError,
+		const result = await resolver.resolveContext({ project_id: "unknown-project" });
+
+		expect(result.resolved_layers).toEqual([]);
+		expect(result.warnings).toEqual(["Project not found: unknown-project"]);
+		expect(result.merged_content).toContain("# Instruction generation errors");
+		expect(result.merged_content).toContain("* Project not found: unknown-project");
+	});
+
+	test("reports layer read errors after the successfully loaded instructions", async () => {
+		const logger = createLogger("test");
+		const resolver = new LayerResolver(
+			{
+				readLayer: async (_type: string, name: string) => {
+					if(name === "broken") {
+						throw new Error("read permission denied");
+					}
+
+					if(name === "working") {
+						return {
+							path: "/registry/layers/global/working.md",
+							relativePath: "layers/global/working.md",
+							content: "Working instructions",
+							revision: "1",
+						};
+					}
+
+					return null;
+				},
+			} as never,
+			{
+				loadWithMeta: async () => ({
+					projectId: "example",
+					manifest: {
+						name: "example",
+						layers: { global: ["working", "broken"] },
+					},
+					manifestPath: "projects/example.yaml",
+				}),
+			} as never,
+			logger,
+			"advers-mcp",
+		);
+
+		const result = await resolver.resolveContext({ project_id: "example" });
+
+		expect(result.merged_content).toStartWith("# Layer: global/working\n\nWorking instructions");
+		expect(result.merged_content).toEndWith("* Failed to load layer global/broken: read permission denied");
+		expect(result.merged_content).toContain(
+			"At the end of message notify user that knowledge MCP server advers-mcp faced",
 		);
 	});
 
-	test("invalid manifest fails parsing", async () => {
-		const { manifestLoader } = buildResolver(fixtureRegistry);
+	test("invalid manifest is reported by the resolver and still fails direct parsing", async () => {
+		const { manifestLoader, resolver } = buildResolver(fixtureRegistry);
 
 		await expect(manifestLoader.load("invalid-manifest")).rejects.toBeInstanceOf(ManifestParseError);
+
+		const result = await resolver.resolveContext({ project_id: "invalid-manifest" });
+		expect(result.warnings?.[0]).toStartWith("Invalid manifest for project 'invalid-manifest':");
+		expect(result.merged_content).toContain("# Instruction generation errors");
 	});
 
 	test("name defaults to project_id when manifest name is missing", async () => {

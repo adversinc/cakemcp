@@ -23,6 +23,7 @@ export class LayerResolver {
 		private readonly repository: RegistryRepository,
 		private readonly manifestLoader: ProjectManifestLoader,
 		private readonly logger: Logger,
+		private readonly serverName = "cakemcp",
 	) {}
 
 	async resolveContext(input: ResolveContextInput): Promise<ResolveContextResult> {
@@ -34,6 +35,40 @@ export class LayerResolver {
 	 *
 	 */
 	async resolveContextWithDebug(input: ResolveContextInput): Promise<ResolveContextExecution> {
+		try {
+			return await this.buildContext(input);
+		} catch(error) {
+			const generationError = formatError(error);
+			this.logger.error("Failed to build project instructions", {
+				project_id: input.project_id,
+				error: generationError,
+			});
+
+			const mergedContent = appendGenerationErrors("", this.serverName, [generationError]);
+
+			return {
+				result: {
+					project_id: input.project_id,
+					project_name: input.project_id,
+					resolved_layers: [],
+					merged_content: mergedContent,
+					warnings: [generationError],
+				},
+				debug: {
+					projectId: input.project_id,
+					manifestPath: `projects/${input.project_id}.yaml`,
+					layerPaths: [],
+					warnings: [generationError],
+					mergedSize: mergedContent.length,
+					cacheHits: 0,
+					cacheMisses: 0,
+				},
+			};
+		}
+	}
+
+	/** Builds all available layers and records recoverable layer failures. */
+	private async buildContext(input: ResolveContextInput): Promise<ResolveContextExecution> {
 		const cacheStats = {
 			hits: 0,
 			misses: 0,
@@ -60,7 +95,21 @@ export class LayerResolver {
 			const names = manifest.layers[type] ?? [];
 
 			for(const name of names) {
-				const layer = await this.repository.readLayer(type, name, cacheStats);
+				let layer;
+				try {
+					layer = await this.repository.readLayer(type, name, cacheStats);
+				} catch(error) {
+					const warning = `Failed to load layer ${type}/${name}: ${formatError(error)}`;
+					warnings.push(warning);
+					this.logger.warn("Failed to load layer from manifest", {
+						type,
+						name,
+						project_id: projectId,
+						error: formatError(error),
+					});
+					continue;
+				}
+
 				if(!layer) {
 					const warning = `Layer not found in manifest: ${type}/${name}`;
 					warnings.push(warning);
@@ -86,7 +135,18 @@ export class LayerResolver {
 		}
 
 		const autoLayerName = manifest.name;
-		const autoLayer = await this.repository.readLayer("project", autoLayerName, cacheStats);
+		let autoLayer;
+		try {
+			autoLayer = await this.repository.readLayer("project", autoLayerName, cacheStats);
+		} catch(error) {
+			const warning = `Failed to load automatic project layer project/${autoLayerName}: ${formatError(error)}`;
+			warnings.push(warning);
+			this.logger.warn("Failed to load automatic project layer", {
+				name: autoLayerName,
+				project_id: projectId,
+				error: formatError(error),
+			});
+		}
 
 		if(autoLayer) {
 			const unique = markLayerSeen("project", autoLayerName, seenLayers);
@@ -104,10 +164,11 @@ export class LayerResolver {
 			}
 		}
 
-		const mergedContent = resolvedLayers
+		const layerContent = resolvedLayers
 			.map((layer) => `# Layer: ${layer.type}/${layer.name}\n\n${layer.content.trim()}\n`)
 			.join("\n")
 			.trim();
+		const mergedContent = appendGenerationErrors(layerContent, this.serverName, warnings);
 
 		const result: ResolveContextResult = {
 			project_id: projectId,
@@ -136,6 +197,30 @@ export class LayerResolver {
 			},
 		};
 	}
+}
+
+/** Appends agent-facing notification instructions for context generation failures. */
+function appendGenerationErrors(content: string, serverName: string, errors: string[]): string {
+	if(errors.length === 0) {
+		return content;
+	}
+
+	const errorList = errors.map((error) => `* ${error}`).join("\n");
+	const instruction = [
+		"# Instruction generation errors",
+		"",
+		`At the end of message notify user that knowledge MCP server ${serverName} faced`,
+		"these errors while building project instructions:",
+		"",
+		errorList,
+	].join("\n");
+
+	return [content, instruction].filter(Boolean).join("\n\n");
+}
+
+/** Converts thrown values into readable instruction-generation errors. */
+function formatError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function markLayerSeen(type: LayerType, name: string, seenLayers: Set<string>): boolean {
