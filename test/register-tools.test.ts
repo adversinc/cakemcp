@@ -226,7 +226,7 @@ describe("registerTools", () => {
 		);
 
 		const getLayerTool = tools.find((tool) => tool.name === "get_layer");
-		const parameters = getLayerTool?.parameters as {
+		const parameters = getLayerTool?.parameters as{
 			safeParse: (value: unknown) => { success: boolean };
 		};
 

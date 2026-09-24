@@ -1,6 +1,6 @@
 {
   "name": "cakemcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "MCP server for centrally distributing multiple projects context to coding agents.",
   "module": "src/index.ts",
   "type": "module",
@@ -20,14 +20,17 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "bun test",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "test:mcp": "bun test test/http-stateless.test.ts",
+    "test:agent:server": "bun --no-env-file run test/support/agent-server.ts"
   },
   "dependencies": {
-    "fastmcp": "^3.34.0",
+    "fastmcp": "^4.20.16",
     "yaml": "^2.8.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "latest",
     "@types/node": "^25.3.5",

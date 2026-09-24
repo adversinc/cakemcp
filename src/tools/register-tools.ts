@@ -171,6 +171,7 @@ type ToolContext = {
 
 type ToolExecutor<TArgs, TResult> = (args: TArgs, context: ToolContext) => Promise<TResult>;
 
+/** Wraps tool execution with duration logging and consistent error reporting. */
 function withToolExecutionLogging<TArgs, TResult>(
 	logger: Logger,
 	toolName: string,
