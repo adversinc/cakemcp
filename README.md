@@ -13,10 +13,10 @@ rules across many repositories.
 The knowledge base itself is collected from either a git repository (public or private), or a local directory.
 
 The knowledge base is split into layers:
-- global agreements
+- global agreements and engineering standards shared across all projects
+- domain-level rules shared by projects in the same business or product area
 - language-specific rules
 - framework-related instructions and agreements
-- domain-level rules shared by projects in the same business or product area
 - project-level specifics
 
 Layers are stored together to make de-duplication and sharing easier across projects, including AI-assisted maintenance 
@@ -124,7 +124,7 @@ repository instead.
 ## Conceptual Limitations
 
 - no database required, vector DB, or embeddings
-- no UI/admin/auth platform
+- optional read-only Web UI; no content editor or account-management platform
 - no heavy enterprise abstractions
 - tool output is returned as a JSON string (MCP-client friendly)
 
@@ -188,9 +188,9 @@ Invalid combinations:
 projects/*.yaml - project manifests
 layers/ - layer markdown files
 layers/global/*.md
+layers/domain/*.md
 layers/language/*.md
 layers/framework/*.md
-layers/domain/*.md
 layers/project/*.md
 ```
 
@@ -240,9 +240,9 @@ Behavior:
 1. Loads `projects/${project_id}.yaml`
 2. Applies layers in strict order:
    - `global`
+   - `domain`
    - `language`
    - `framework`
-   - `domain`
    - `project` (from manifest)
 3. Always tries to append `layers/project/${projectName}.md`
 4. Merges markdown into `merged_content` with layer separators
@@ -355,3 +355,161 @@ To debug the actual output of `resolve_context` and other tools, use official SD
 ```bash
 npx @modelcontextprotocol/inspector
 ```
+
+## Web UI
+
+The optional viewer provides **Projects**, **Layers**, **Cross-references**, **Diagnostics**, and **Registry** pages,
+with light/dark/system themes, direct links, layer usage, and a `Ctrl+K` / `Cmd+K` quick search.
+Project pages include the exact assembled context (with sanitized operational errors), ordered layers,
+raw YAML, and diagnostics. Copy or download instructions in their original language.
+Registry documents are read-only and embedded HTML is not executed. Remote Markdown images are
+rendered as alt text to avoid external tracking requests.
+
+### Enable the viewer
+
+```bash
+bun install
+bun run build:web
+WEB_UI_ENABLED=true WEB_UI_PORT=8081 bun run start
+```
+
+Open `http://localhost:8081`. The viewer is disabled by default. It uses a separate Bun HTTP listener
+in the same process, sharing registry/resolver instances with MCP. It works with both `stdio` and
+`httpStream`; all application logs go to stderr to preserve the stdio protocol stream.
+`SIGINT` and `SIGTERM` stop both listeners. A port binding failure stops startup.
+
+| Variable | Default / requirement |
+| --- | --- |
+| `WEB_UI_ENABLED` | `false`; `true` or `1` enables the viewer |
+| `WEB_UI_PORT` | Required when enabled; integer 1–65535, distinct from the MCP HTTP port |
+| `WEB_UI_HOST` | `0.0.0.0` |
+| `WEB_UI_CONFIG` | Unset/empty means public access; JSON object or local JSON file path |
+| `WEB_UI_BASE_URL` | Required with SSO; public origin without a path |
+| `WEB_UI_SESSION_SECRET` | Required with SSO; at least 32 bytes of random material, shared across replicas |
+| `BABELSHARK_PROJECT_ID` | Optional positive integer; requires access code as well |
+| `BABELSHARK_ACCESS_CODE` | Optional public embed code; requires project ID as well |
+
+With no SSO providers, **both the viewer and its read-only API are public**, independently of MCP
+authentication. The interface displays **Public access**. Disabling the viewer starts no additional
+listener and requires none of its settings.
+
+### Configure multiple SSO providers
+
+Create a **Web** OIDC application in each Zitadel project, using Authorization Code, PKCE S256,
+and `client_secret_post` authentication. Set **User Roles Inside ID Token** and ensure the
+project-specific roles are returned (the viewer requests `urn:zitadel:iam:org:projects:roles`).
+Create and assign the `cakemcp-viewer` project role to authorized users.
+
+Use `web-ui.example.json` as a template. Replace its client and project IDs with your own values.
+The callback URL for each provider is:
+
+```text
+https://context.example.com/auth/callback/onquests
+https://context.example.com/auth/callback/mysmartbots
+```
+
+Set configuration using either form:
+
+```bash
+# File path; paths are relative to the process working directory unless absolute.
+WEB_UI_CONFIG=./web-ui.example.json
+
+# Equivalent inline JSON (one provider shown).
+WEB_UI_CONFIG='{"sso":{"providers":[{"id":"onquests","name":"OnQuests","issuer":"https://auth.onquests.ru","clientId":"YOUR_CLIENT_ID","clientSecretEnv":"ONQUESTS_WEB_CLIENT_SECRET","projectId":"123456789","requiredRole":"cakemcp-viewer"}]}}'
+```
+
+Set `ONQUESTS_WEB_CLIENT_SECRET` and `MYSMARTBOTS_WEB_CLIENT_SECRET` in the environment, along with
+`WEB_UI_BASE_URL` and `WEB_UI_SESSION_SECRET` (`openssl rand -hex 32` can generate the latter).
+Never put client secrets in the frontend. Provider names, IDs and BabelShark public embed credentials
+are the only configuration exposed by `/api/session`.
+
+`WEB_UI_CONFIG` is parsed as JSON first; successfully parsed values must be objects matching the schema.
+Malformed values beginning with `{` or `[` are rejected as JSON. Other values are literal file paths:
+URLs and control characters are rejected; shell syntax, `~`, and environment variables are not expanded.
+The target must be a readable regular file containing valid JSON. Symlinks to regular files are supported
+for Kubernetes mounts. Invalid explicit configuration fails startup rather than opening access.
+An empty object, omitted `sso.providers`, or an empty provider array deliberately selects public access.
+Settings are read at startup; restart to apply changes.
+
+The backend validates OIDC signatures, issuer, audience, nonce, state, PKCE, and the role under
+`urn:zitadel:iam:org:project:{projectId}:roles`. A generic role claim from another project is not sufficient.
+Users are identified by `(issuer, sub)`; matching email addresses are not merged.
+
+Sessions use encrypted, authenticated, host-only `HttpOnly; Secure; SameSite=Lax` cookies containing
+no OIDC tokens. They expire after one hour, at which point roles are checked on the next login.
+Role revocation therefore takes effect within one hour. Provider-policy changes invalidate existing
+sessions after restart. A common secret allows multiple replicas without a session database.
+Sign out clears the browser session only; it does not log the user out of their other SSO applications.
+As with stateless cookies generally, a separately copied cookie remains valid until expiry.
+HTTPS is required in production. Plain HTTP is allowed only on loopback origins outside production.
+
+### BabelShark
+
+Provide **both** `BABELSHARK_PROJECT_ID` and `BABELSHARK_ACCESS_CODE` to enable the single embed loader
+and language selector. With either value missing, no localization script is loaded and no selector
+is shown. If loading fails, the English UI remains usable.
+
+English source strings use BabelShark `__` markers, dynamic values use `__var`, and registry content
+uses `__bs-ignore`. There is no parallel translation-key dictionary. Browser language detection is
+disabled; users choose the language through the built-in selector. Attribute-only labels remain in
+English unless supported by the configured embed version; translatable text labels accompany controls.
+Real translation availability depends on the configured BabelShark project.
+
+### Development and verification
+
+```bash
+bun run build:web
+bun --no-env-file test
+bun run typecheck
+bun run typecheck:web
+bun run lint
+bunx playwright install chromium --only-shell
+bun run test:e2e
+```
+
+For frontend HMR, start the enabled backend and run `WEB_UI_PORT=8081 bun run dev:web` in a second
+terminal. Vite proxies `/api` and `/auth` to that backend. For SSO development, set `WEB_UI_BASE_URL`
+and the Zitadel callback URL to the Vite origin. Production serves built assets directly from Bun;
+no Vite server is needed.
+
+Browser tests use an isolated fixture registry. OIDC integration tests run a local provider with signed
+tokens and cover both providers, denial, invalid claims/signatures, PKCE, expiry and logout. BabelShark
+browser tests validate configuration, loader isolation and markup with a stub; real SSO and translated
+language checks require deployment-specific credentials.
+
+### Docker
+
+The image builds the frontend with development dependencies and includes its static output:
+
+```bash
+docker build -t cakemcp .
+docker run --rm -i -p 8081:8081 \
+  -v "$PWD/demo-data:/registry:ro" \
+  -e CONTEXT_REGISTRY=/registry -e REGISTRY_DIR=. \
+  -e WEB_UI_ENABLED=true -e WEB_UI_PORT=8081 cakemcp
+```
+
+This example uses MCP stdio and public viewer access. With HTTP MCP, additionally publish its port and
+configure its existing authentication settings. For SSO mount the JSON config read-only, inject secrets,
+and route the public HTTPS origin to the viewer port. TLS termination may be handled by your proxy.
+
+### Read-only API
+
+- `GET /api/session`: public login options, current browser identity and optional BabelShark config.
+- `GET /api/catalog`: projects, all layers, usage index and diagnostics.
+- `GET /api/projects/:id`: raw manifest, assembled context and ordered layer metadata.
+- `GET /api/layers/:type/:name`: source text and revision.
+- `GET /api/registry`: availability and sanitized synchronization status.
+
+All data routes require a viewer session when SSO is configured. Responses are not cached by browsers;
+registry reads still respect `CACHE_EXPIRY`. Refreshing the UI does not force a Git fetch. Failed Git
+refreshes keep serving the previous checkout and retry after the cache interval. No absolute server
+paths or provider credentials are included in operational API responses.
+
+### Conditional cross-references
+
+The Cross-references page indexes Markdown text blocks containing both `resolve_context` and a literal
+`project_id=...` assignment (with optional whitespace and quotes). Wrapped lines within a paragraph are supported; separate paragraphs and list items are kept apart. Each occurrence shows its layer, starting line number, source projects, target project, and original instruction.
+Shared layers list all projects that include them in one row, including automatic project layers. Unused layers and missing targets
+are labeled explicitly. This is a textual index, not an evaluation of conditions or a recursive
+context expansion. It is rebuilt with the viewer catalog and follows the registry cache lifetime.

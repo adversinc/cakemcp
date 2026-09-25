@@ -138,7 +138,7 @@ export function registerTools(
 		},
 		...(canAccess ? { canAccess } : {}),
 		parameters: z.object({
-			type: z.enum(["global", "language", "framework", "domain", "project"]),
+			type: z.enum(["global", "domain", "language", "framework", "project"]),
 			name: z.string().min(1),
 		}),
 		execute: withToolExecutionLogging(logger, "get_layer", async ({ type, name }) => {

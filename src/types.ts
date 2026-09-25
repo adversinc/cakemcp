@@ -1,4 +1,4 @@
-export type LayerType = "global" | "language" | "framework" | "domain" | "project";
+export type LayerType = "global" | "domain" | "language" | "framework" | "project";
 
 export type LayerRecord = {
 	type: LayerType;

@@ -1,3 +1,5 @@
+import vue from "eslint-plugin-vue";
+
 import stylistic from "@stylistic/eslint-plugin";
 import jsdoc from "eslint-plugin-jsdoc";
 import tseslint from "typescript-eslint";
@@ -16,11 +18,16 @@ const indentRule = [
 ];
 
 export default tseslint.config(
+	...vue.configs["flat/essential"],
+	{ files: ["**/*.vue"], languageOptions: { parserOptions: { parser: tseslint.parser } }, rules: { "vue/multi-word-component-names": "off" } },
 	{
 		ignores: [
 			"node_modules/**",
 			"demo-data/**",
 			"local-data/**",
+			"dist/**",
+			"test-results/**",
+			"playwright-report/**",
 		],
 	},
 	{

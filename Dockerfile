@@ -4,30 +4,25 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends git ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# install dependencies into temp directory
-# this will cache them and speed up future builds
-FROM base AS install
+FROM node:24-bookworm-slim AS node-runtime
 
-# install with --production (exclude devDependencies)
-RUN mkdir -p /temp/prod
-COPY package.json bun.lock /temp/prod/
-
-RUN cd /temp/prod && bun install --frozen-lockfile --production
-
-# copy node_modules from temp directory
-# then copy all (non-ignored) project files into the image
-FROM base AS prerelease
-COPY --from=install /temp/prod/node_modules node_modules
+FROM base AS build
+# vue-tsc requires Node; the production image continues to run only Bun.
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 COPY . .
+RUN bun run typecheck && bun run typecheck:web && bun run lint
+RUN bun test && bun run build:web
 
-ENV NODE_ENV=production
-RUN bun test
+FROM base AS production-dependencies
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
 
-# copy production dependencies and source code into final image
 FROM base AS release
-COPY --from=install /temp/prod/node_modules node_modules
-COPY --from=prerelease /usr/src/app .
-
-# run the app
-#USER bun
-ENTRYPOINT [ "bun", "run", "index.ts" ]
+ENV NODE_ENV=production
+COPY --from=production-dependencies /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/src ./src
+COPY --from=build /usr/src/app/dist/web ./dist/web
+COPY --from=build /usr/src/app/index.ts /usr/src/app/package.json ./
+ENTRYPOINT ["bun", "run", "index.ts"]

@@ -1,6 +1,6 @@
 {
   "name": "cakemcp",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "MCP server for centrally distributing multiple projects context to coding agents.",
   "module": "src/index.ts",
   "type": "module",
@@ -22,21 +22,45 @@
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
     "test:mcp": "bun test test/http-stateless.test.ts",
-    "test:agent:server": "bun --no-env-file run test/support/agent-server.ts"
+    "test:agent:server": "bun --no-env-file run test/support/agent-server.ts",
+    "build:web": "vite build --config web/vite.config.ts web",
+    "dev:web": "vite --config web/vite.config.ts web",
+    "typecheck:web": "vue-tsc --noEmit -p web/tsconfig.json",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@lucide/vue": "^1.48.0",
+    "@vueuse/core": "^15.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "fastmcp": "^4.20.16",
+    "jose": "^6.2.12",
+    "lucide-vue-next": "^1.0.0",
+    "markdown-it": "^15.0.2",
+    "openid-client": "^6.8.8",
+    "reka-ui": "^2.10.5",
+    "tailwind-merge": "^3.7.0",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1",
     "yaml": "^2.8.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@playwright/test": "^1.63.0",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "latest",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^25.3.5",
+    "@vitejs/plugin-vue": "^6.0.9",
     "eslint": "^10.0.3",
     "eslint-plugin-jsdoc": "^62.8.0",
-    "typescript-eslint": "^8.57.1"
+    "eslint-plugin-vue": "^10.11.1",
+    "tailwindcss": "^4.3.3",
+    "typescript-eslint": "^8.57.1",
+    "vite": "^8.3.1",
+    "vue-tsc": "^3.3.11"
   },
   "peerDependencies": {
     "typescript": "^5"

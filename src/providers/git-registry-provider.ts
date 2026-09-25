@@ -7,7 +7,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { GitRefreshFailedError, RegistryUnavailableError } from "../errors";
 import type { Logger } from "../logger";
 import { resolveRegistryRoot } from "../utils/registry";
-import type { RegistryProvider } from "./types";
+import type { RegistryProvider, RegistryStatus } from "./types";
 
 type GitRunOptions = {
 	cwd?: string;
@@ -24,7 +24,15 @@ export class GitRegistryProvider implements RegistryProvider {
 	private readonly cacheDir: string;
 	private readonly auth: GitAuth;
 	private lastRefreshAt = 0;
+	private lastAttemptAt = 0;
 	private currentRevision?: string;
+	private refreshFailed = false;
+	private rootRequest?: Promise<string>;
+
+	/** Exposes sync metadata without repository URLs, credentials, or local paths. */
+	getStatus(): RegistryStatus {
+		return { type: this.type, revision: this.currentRevision, lastSuccessfulUpdate: this.lastRefreshAt ? new Date(this.lastRefreshAt).toISOString() : undefined, stale: this.refreshFailed, ...(this.refreshFailed ? { error: "Registry synchronization failed; serving the previous checkout." } : {}) };
+	}
 
 	/**
 	 *
@@ -48,26 +56,36 @@ export class GitRegistryProvider implements RegistryProvider {
 	 *
 	 */
 	async getRootPath(): Promise<string> {
+		if(!this.rootRequest) this.rootRequest = this.loadRootPath().finally(() => { this.rootRequest = undefined; });
+		return this.rootRequest;
+	}
+
+	/** Serializes checkout mutations shared by MCP and Web UI requests. */
+	private async loadRootPath(): Promise<string> {
 		await mkdir(path.dirname(this.cacheDir), { recursive: true });
 
 		const hasLocalCopy = existsSync(path.join(this.cacheDir, ".git"));
-		const cacheExpired = Date.now() - this.lastRefreshAt >= this.cacheExpiryMs;
+		const cacheExpired = Date.now() - this.lastAttemptAt >= this.cacheExpiryMs;
 
 		if(!hasLocalCopy) {
 			this.logger.info("Cloning git registry", { provider: "git" });
 			await this.clone();
-			this.lastRefreshAt = Date.now();
 			this.currentRevision = await this.readHeadRevision();
+			this.lastRefreshAt = Date.now();
+			this.lastAttemptAt = this.lastRefreshAt;
 			return resolveRegistryRoot(this.cacheDir, this.registryDir);
 		}
 
 		if(cacheExpired) {
+			this.lastAttemptAt = Date.now();
 			this.logger.info("Refreshing git registry cache", { provider: "git" });
 			try {
 				await this.refresh();
-				this.lastRefreshAt = Date.now();
 				this.currentRevision = await this.readHeadRevision();
+				this.lastRefreshAt = Date.now();
+				this.refreshFailed = false;
 			} catch (error) {
+				this.refreshFailed = true;
 				this.logger.error("Git refresh failed; using stale cache", {
 					provider: "git",
 					error: asErrorMessage(error),

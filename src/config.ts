@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 
+import { readWebConfig, type WebConfig } from "./web/config";
+
 import { InvalidEnvConfigError } from "./errors";
 
 const DEFAULT_CACHE_EXPIRY_SECONDS = 300;
 const DEFAULT_REGISTRY_DIR = "contexts";
 
 export type AppConfig = {
+	web: WebConfig;
 	contextRegistry: string;
 	registryDir: string;
 	registryKey?: string;
@@ -58,6 +61,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	const auth = readAuthConfig(env, transportType);
 
 	return {
+		web: readWebConfig(env, transportType, httpPort),
 		contextRegistry,
 		registryDir: readRegistryDir(env),
 		registryKey: readRegistryKey(env),

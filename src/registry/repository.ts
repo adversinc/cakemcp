@@ -53,6 +53,23 @@ export class RegistryRepository {
 		});
 	}
 
+	/** Enumerates the supported layer layout, including currently unused layers. */
+	async listLayers(): Promise<{ type: LayerType; name: string }[]> {
+		const root = await this.provider.getRootPath();
+		const result: { type: LayerType; name: string }[] = [];
+		for(const type of ["global", "domain", "language", "framework", "project"] as LayerType[]) {
+			try {
+				const entries = await readdir(path.join(root, "layers", type), { withFileTypes: true });
+				for(const entry of entries) {
+					if(entry.isFile() && /^[a-zA-Z0-9._-]+\.md$/.test(entry.name)) result.push({ type, name: entry.name.slice(0, -3) });
+				}
+			} catch(error) {
+				if((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+			}
+		}
+		return result.sort((a, b) => `${a.type}/${a.name}`.localeCompare(`${b.type}/${b.name}`));
+	}
+
 	/**
 	 *
 	 */

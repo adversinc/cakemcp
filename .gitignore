@@ -36,3 +36,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 local-data
 
 output.log
+
+# Browser verification artifacts
+test-results/
+playwright-report/
+
+local-test.sh

@@ -10,6 +10,7 @@ import type { Logger } from "../src/logger";
 function createBaseConfig(): AppConfig {
 	return {
 		auth: { mode: "none" },
+		web: { enabled: false },
 		cacheExpirySeconds: 300,
 		contextRegistry: "/tmp/context-registry",
 		debugMcp: false,

@@ -22,7 +22,7 @@ export function createLogger(component: string): Logger {
 			...fields,
 		};
 
-		console.log(JSON.stringify(payload));
+		console.error(JSON.stringify(payload));
 	};
 
 	return {

@@ -9,12 +9,12 @@ import type {
 } from "../types";
 import type { ProjectManifestLoader } from "./manifest-loader";
 
-const RESOLUTION_ORDER: LayerType[] = ["global", "language", "framework", "domain", "project"];
+const RESOLUTION_ORDER: LayerType[] = ["global", "domain", "language", "framework", "project"];
 const BASE_PRIORITY: Record<LayerType, number> = {
 	global: 100,
-	language: 200,
-	framework: 300,
-	domain: 400,
+	domain: 200,
+	language: 300,
+	framework: 400,
 	project: 500,
 };
 

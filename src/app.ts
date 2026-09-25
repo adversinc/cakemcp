@@ -69,5 +69,6 @@ export async function buildServer() {
 	return {
 		config,
 		server,
+		repository, manifestLoader, layerResolver, provider, logger,
 	};
 }

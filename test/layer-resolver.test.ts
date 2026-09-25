@@ -42,8 +42,8 @@ describe("LayerResolver", () => {
 			101,
 			200,
 			300,
-			301,
 			400,
+			401,
 			500,
 			501,
 		]);
@@ -61,13 +61,15 @@ describe("LayerResolver", () => {
 		expect(ordered).toEqual([
 			"global/formatting",
 			"global/engineering",
+			"domain/commerce",
 			"language/typescript",
 			"framework/nextjs",
 			"framework/bun",
-			"domain/commerce",
 			"project/payment-rules",
 			"project/billing-service",
 		]);
+		const headings = result.merged_content.split("\n").filter(line => line.startsWith("# Layer: ")).map(line => line.slice("# Layer: ".length));
+		expect(headings).toEqual(ordered);
 	});
 
 	test("missing project returns an instruction generation error", async () => {

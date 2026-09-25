@@ -1,0 +1,24 @@
+{
+  "sso": {
+    "providers": [
+      {
+        "id": "onquests",
+        "name": "OnQuests",
+        "issuer": "https://auth.onquests.ru",
+        "clientId": "YOUR_ONQUESTS_WEB_CLIENT_ID",
+        "clientSecretEnv": "ONQUESTS_WEB_CLIENT_SECRET",
+        "projectId": "123456789",
+        "requiredRole": "cakemcp-viewer"
+      },
+      {
+        "id": "mysmartbots",
+        "name": "MySmartBots",
+        "issuer": "https://auth.mysmartbots.com",
+        "clientId": "YOUR_MYSMARTBOTS_WEB_CLIENT_ID",
+        "clientSecretEnv": "MYSMARTBOTS_WEB_CLIENT_SECRET",
+        "projectId": "987654321",
+        "requiredRole": "cakemcp-viewer"
+      }
+    ]
+  }
+}

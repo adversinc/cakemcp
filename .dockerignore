@@ -4,3 +4,13 @@ node_modules
 .env
 output.log
 coverage
+dist
+test-results
+playwright-report
+web/node_modules
+local-data
+.idea
+.codex
+.agents
+.env.*
+!.env.example
