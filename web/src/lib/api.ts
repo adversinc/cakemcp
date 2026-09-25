@@ -1,3 +1,4 @@
+import { webPath } from "./base-path";
 import { reactive, shallowRef } from "vue";
 
 export type Diagnostic = { severity: "error" | "warning" | "info"; message: string; projectId?: string; layer?: string };
@@ -13,7 +14,7 @@ export const state = reactive({ loading: false, error: "" });
 
 /** Reads same-origin data and invalidates the visible identity on session expiry. */
 export async function api<T>(path: string): Promise<T> {
-	const response = await fetch(`/api${path}`, { credentials: "same-origin" });
+	const response = await fetch(webPath(`/api${path}`), { credentials: "same-origin" });
 	if(response.status === 401) {
 		catalog.value = undefined;
 		if(session.value) session.value = { ...session.value, viewer: null };

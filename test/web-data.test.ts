@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { LocalRegistryProvider } from "../src/providers/local-registry-provider";
 import { RegistryRepository } from "../src/registry/repository";
@@ -68,4 +70,24 @@ test("SSO data routes deny absent and forged cookies while login metadata stays 
 	expect(body).toContain('"name":"One"');
 	expect(body).not.toContain("secret");
 	expect(body).not.toContain("issuer.example");
+});
+
+
+test("runtime prefix scopes API, assets and deep links without affecting root mode", async () => {
+	const assets = await mkdtemp(resolve(tmpdir(), "cakemcp-web-assets-"));
+	try {
+		await mkdir(resolve(assets, "assets"));
+		await writeFile(resolve(assets, "index.html"), '<html><head></head><body><script src="./assets/app.js"></script></body></html>');
+		await writeFile(resolve(assets, "assets/app.js"), "export {};");
+		const handler = createWebHandler({ enabled: true, port: 8081, host: "127.0.0.1", providers: [], basePath: "/browse" }, deps, assets);
+		const call = (path: string) => handler(new Request(`http://localhost${path}`));
+		expect((await call("/browse?x=1")).headers.get("location")).toBe("/browse/?x=1");
+		for(const path of ["/api/catalog", "/browse-other/api/catalog", "/projects"]) expect((await call(path)).status).toBe(404);
+		expect((await call("/browse/api/catalog")).status).toBe(200);
+		const html = await (await call("/browse/projects/name-fallback")).text();
+		expect(html).toContain('<base href="/browse/">');
+		const asset = /src="\.\/(assets\/[^" ]+)"/.exec(html)?.[1];
+		expect(asset).toBeDefined();
+		expect((await call(`/browse/${asset}`)).status).toBe(200);
+	} finally { await rm(assets, { recursive: true, force: true }); }
 });

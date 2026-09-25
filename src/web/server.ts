@@ -15,7 +15,10 @@ export function createWebHandler(config: Extract<WebConfig, { enabled: true }>, 
 	const json = (value: unknown, status = 200) => Response.json(value, { status });
 	const handle = async (request: Request): Promise<Response> => {
 		const url = new URL(request.url);
-		const pathname = url.pathname;
+		const prefix = config.basePath || "";
+		if(prefix && url.pathname === prefix) return new Response(null, { status: 308, headers: { Location: `${prefix}/${url.search}` } });
+		if(prefix && !url.pathname.startsWith(`${prefix}/`)) return json({ error: "Not found." }, 404);
+		const pathname = url.pathname.slice(prefix.length);
 		if(pathname.startsWith("/auth/")) return auth.handle(request, pathname);
 		if(request.method !== "GET" && request.method !== "HEAD") return json({ error: "This API is read-only." }, 405);
 		const viewer = await auth.viewer(request);
@@ -49,7 +52,8 @@ export function createWebHandler(config: Extract<WebConfig, { enabled: true }>, 
 		}
 		const html = Bun.file(path.join(assets, "index.html"));
 		if(!await html.exists()) return new Response("Web UI assets are missing. Run bun run build:web.", { status: 503 });
-		return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+		const document = (await html.text()).replace("<head>", `<head><base href="${prefix}/">`);
+		return new Response(document, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 	};
 	return async (request: Request): Promise<Response> => {
 		let response: Response;

@@ -8,6 +8,15 @@ const enabled = { WEB_UI_ENABLED: "true", WEB_UI_PORT: "8081" };
 const provider = { id: "one", name: "One", issuer: "https://example.com", clientId: "client", clientSecretEnv: "SSO_SECRET", projectId: "123", requiredRole: "cakemcp-viewer" };
 
 describe("Web UI configuration", () => {
+	test("validates and normalizes the runtime mount path", () => {
+		for(const [value, expected] of [[undefined, ""], ["/", ""], ["/browse/", "/browse"], ["/tools/browse", "/tools/browse"]]) {
+			const config = readWebConfig({ ...enabled, WEB_UI_BASE_PATH: value }, "stdio", 8080);
+			expect(config.enabled && config.basePath).toBe(expected);
+		}
+		for(const value of ["browse", "//", "/../browse", "/browse?x", "/browse#x", "/%62rowse", "/a//b", '/a"b']) {
+			expect(() => readWebConfig({ ...enabled, WEB_UI_BASE_PATH: value }, "stdio", 8080)).toThrow("WEB_UI_BASE_PATH");
+		}
+	});
 	test("disabled by default, ignores unused settings, and requires a distinct valid port when enabled", () => {
 		expect(readWebConfig({ WEB_UI_CONFIG: "{broken" }, "stdio", 8080)).toEqual({ enabled: false });
 		for(const port of [undefined, "", "0", "65536", "42.5", "8081oops", "-1"]) {

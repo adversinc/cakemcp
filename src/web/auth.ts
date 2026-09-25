@@ -103,7 +103,7 @@ export class WebAuth {
 		if(!provider || !match) return new Response(null, { status: 404 });
 		try {
 			const client = await this.client(provider);
-			const redirectUri = `${this.config.baseUrl}/auth/callback/${provider.id}`;
+			const redirectUri = `${this.config.baseUrl}${this.config.basePath || ""}/auth/callback/${provider.id}`;
 			if(match[1] === "login") {
 				const verifier = oidc.randomPKCECodeVerifier();
 				const nonce = oidc.randomNonce();
@@ -131,7 +131,7 @@ export class WebAuth {
 				return this.failedLogin("access_denied");
 			}
 			const viewer: Viewer = { subject: claims.sub, issuer: provider.issuer, providerId: provider.id, name: String(claims.name ?? claims.preferred_username ?? "Viewer").slice(0, 120) };
-			const headers = new Headers({ Location: "/projects" });
+			const headers = new Headers({ Location: `${this.config.basePath || ""}/projects` });
 			headers.append("Set-Cookie", this.cookie(this.sessionName, await this.seal(viewer, "session", 3600), 3600));
 			headers.append("Set-Cookie", this.cookie(this.transactionName, "", 0));
 			return new Response(null, { status: 302, headers });
@@ -140,6 +140,6 @@ export class WebAuth {
 
 	/** Uses fixed, non-sensitive error codes and always discards a failed transaction. */
 	private failedLogin(code: string): Response {
-		return new Response(null, { status: 302, headers: { Location: `/login?error=${code}`, "Set-Cookie": this.cookie(this.transactionName, "", 0) } });
+		return new Response(null, { status: 302, headers: { Location: `${this.config.basePath || ""}/login?error=${code}`, "Set-Cookie": this.cookie(this.transactionName, "", 0) } });
 	}
 }

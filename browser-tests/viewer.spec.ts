@@ -1,5 +1,22 @@
 import { expect, test } from "@playwright/test";
 
+test("viewer works under a runtime prefix, including direct links and refresh", async ({ page }) => {
+	const failures: string[] = [];
+	page.on("pageerror", error => failures.push(error.message));
+	await page.goto("/browse");
+	await expect(page).toHaveURL(/\/browse\/projects$/);
+	await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
+	await page.getByRole("link", { name: "Cross-references", exact: true }).click();
+	await expect(page).toHaveURL(/\/browse\/cross-references$/);
+	await page.goto("/browse/projects/name-fallback");
+	await expect(page.locator(".prose")).toContainText("Prefer explicit naming.");
+	await page.reload();
+	await expect(page.locator(".prose")).toBeVisible();
+	await page.getByRole("button", { name: "Refresh registry data" }).click();
+	await expect(page.locator(".prose")).toContainText("Prefer explicit naming.");
+	expect(failures).toEqual([]);
+});
+
 test("cross-references navigation, source links, missing targets and search", async ({ page }) => {
 	await page.route("**/api/catalog", async route => {
 		const response = await route.fetch();

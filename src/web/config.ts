@@ -21,6 +21,7 @@ export type WebConfig = { enabled: false } | {
 	enabled: true;
 	port: number;
 	host: string;
+	basePath?: string;
 	baseUrl?: string;
 	sessionSecret?: string;
 	providers: SsoProvider[];
@@ -76,6 +77,8 @@ export function readWebConfig(env: NodeJS.ProcessEnv, transport: string, mcpPort
 	const port = Number(portText);
 	if(!/^\d+$/.test(portText) || port < 1 || port > 65535) throw new InvalidEnvConfigError("WEB_UI_PORT must be an integer from 1 to 65535");
 	if(transport === "httpStream" && port === mcpPort) throw new InvalidEnvConfigError("WEB_UI_PORT must differ from the MCP HTTP port");
+	const basePath = (env.WEB_UI_BASE_PATH?.trim() || "/").replace(/\/$/, "");
+	if(basePath && (!/^\/(?:[a-zA-Z0-9_-]+)(?:\/[a-zA-Z0-9_-]+)*$/.test(basePath))) throw new InvalidEnvConfigError("WEB_UI_BASE_PATH must be / or a path of letters, digits, underscores and hyphens");
 	const doc = readWebDocument(env.WEB_UI_CONFIG);
 	const ids = new Set<string>();
 	const production = env.NODE_ENV === "production";
@@ -105,5 +108,5 @@ export function readWebConfig(env: NodeJS.ProcessEnv, transport: string, mcpPort
 		}
 		babelshark = { projectId: Number(projectId), accessCode };
 	}
-	return { enabled: true, port, host: env.WEB_UI_HOST?.trim() || "0.0.0.0", providers, baseUrl, sessionSecret, babelshark };
+	return { enabled: true, port, host: env.WEB_UI_HOST?.trim() || "0.0.0.0", providers, basePath, baseUrl, sessionSecret, babelshark };
 }

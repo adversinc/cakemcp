@@ -58,6 +58,15 @@ async function login(auth: WebAuth, id = "one", mode = "valid") {
 }
 
 describe("viewer OIDC authentication", () => {
+	test("prefixes callback and login redirects while logout checks the public origin", async () => {
+		const auth = new WebAuth({ ...settings(), basePath: "/browse" });
+		const start = await auth.handle(new Request("http://localhost:8081/browse/auth/login/one"), "/auth/login/one");
+		expect(new URL(start.headers.get("location")!).searchParams.get("redirect_uri")).toBe("http://localhost:8081/browse/auth/callback/one");
+		expect((await login(auth)).headers.get("location")).toBe("/browse/projects");
+		expect((await login(auth, "one", "role")).headers.get("location")).toBe("/browse/login?error=access_denied");
+		const logout = await auth.handle(new Request("http://localhost:8081/browse/auth/logout", { method: "POST", headers: { origin: "http://localhost:8081" } }), "/auth/logout");
+		expect(logout.status).toBe(200);
+	});
 	test("both configured providers complete PKCE login and create token-free sessions", async () => {
 		for(const id of ["one", "two"]) {
 			const auth = new WebAuth(settings());

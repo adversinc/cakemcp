@@ -383,6 +383,7 @@ in the same process, sharing registry/resolver instances with MCP. It works with
 | `WEB_UI_ENABLED` | `false`; `true` or `1` enables the viewer |
 | `WEB_UI_PORT` | Required when enabled; integer 1–65535, distinct from the MCP HTTP port |
 | `WEB_UI_HOST` | `0.0.0.0` |
+| `WEB_UI_BASE_PATH` | `/`; optional URL prefix such as `/browse`, configured at runtime |
 | `WEB_UI_CONFIG` | Unset/empty means public access; JSON object or local JSON file path |
 | `WEB_UI_BASE_URL` | Required with SSO; public origin without a path |
 | `WEB_UI_SESSION_SECRET` | Required with SSO; at least 32 bytes of random material, shared across replicas |
@@ -513,3 +514,16 @@ The Cross-references page indexes Markdown text blocks containing both `resolve_
 Shared layers list all projects that include them in one row, including automatic project layers. Unused layers and missing targets
 are labeled explicitly. This is a textual index, not an evaluation of conditions or a recursive
 context expansion. It is rebuilt with the viewer catalog and follows the registry cache lifetime.
+
+### Hosting the viewer under a path
+
+Set `WEB_UI_ENABLED=true`, `WEB_UI_PORT=8081`, and `WEB_UI_BASE_PATH=/browse`.
+Route `/browse` with a Kubernetes Ingress `Prefix` path to the viewer service port 8081,
+without stripping or rewriting the prefix. Keep the existing `/` route on MCP port 8080.
+The same production image supports both root and prefixed hosting; no rebuild for the path is required.
+The server redirects `/browse` to `/browse/`, and deep links, assets, API and authentication stay under this prefix.
+
+With SSO, keep `WEB_UI_BASE_URL=https://cakemcp.infra.mysmartbots.com` (origin only) and register
+`https://cakemcp.infra.mysmartbots.com/browse/auth/callback/<provider-id>` in each Zitadel application.
+Session cookies remain host-only with `Path=/` to retain the `__Host-` security guarantees.
+For Vite development use the default root path; test prefixed hosting through the production Bun viewer.

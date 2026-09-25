@@ -11,5 +11,7 @@ const repository = new RegistryRepository(provider, 300, logger);
 const manifestLoader = new ProjectManifestLoader(repository);
 const layerResolver = new LayerResolver(repository, manifestLoader, logger);
 const port = Number(process.env.E2E_PORT || 4178);
-const server = Bun.serve({ hostname: "127.0.0.1", port, fetch: createWebHandler({ enabled: true, host: "127.0.0.1", port, providers: [] }, { provider, repository, manifestLoader, layerResolver }) });
+const rootHandler = createWebHandler({ enabled: true, host: "127.0.0.1", port, providers: [] }, { provider, repository, manifestLoader, layerResolver });
+const prefixHandler = createWebHandler({ enabled: true, host: "127.0.0.1", port, providers: [], basePath: "/browse" }, { provider, repository, manifestLoader, layerResolver });
+const server = Bun.serve({ hostname: "127.0.0.1", port, fetch: request => new URL(request.url).pathname.startsWith("/browse") ? prefixHandler(request) : rootHandler(request) });
 process.once("SIGTERM", () => { server.stop(true); process.exit(0); });

@@ -1,5 +1,6 @@
 import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
+import { basePath } from "./lib/base-path";
 import App from "./App.vue";
 import Projects from "./pages/Projects.vue";
 import Project from "./pages/Project.vue";
@@ -9,7 +10,7 @@ import Diagnostics from "./pages/Diagnostics.vue";
 import Registry from "./pages/Registry.vue";
 import "./style.css";
 
-const router = createRouter({ history: createWebHistory(), routes: [
+const router = createRouter({ history: createWebHistory(`${basePath}/`), routes: [
 	{ path: "/", redirect: "/projects" },
 	{ path: "/projects", component: Projects, meta: { title: "Projects" } },
 	{ path: "/projects/:id/:tab?", component: Project, meta: { title: "Projects" } },
@@ -18,6 +19,6 @@ const router = createRouter({ history: createWebHistory(), routes: [
 	{ path: "/diagnostics", component: Diagnostics, meta: { title: "Diagnostics" } },
 	{ path: "/registry", component: Registry, meta: { title: "Registry" } },
 	{ path: "/login", component: Projects, meta: { title: "Sign in" } },
-	{ path: "/:pathMatch(.*)*", component: { template: '<div class="empty"><h1 class="__">Page not found</h1><a class="__" href="/projects">Back to projects</a></div>' } },
+	{ path: "/:pathMatch(.*)*", component: { template: '<div class="empty"><h1 class="__">Page not found</h1><RouterLink class="__" to="/projects">Back to projects</RouterLink></div>' } },
 ] });
 createApp(App).use(router).mount("#app");
